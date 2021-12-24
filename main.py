@@ -1,5 +1,6 @@
 import discord
 import logging
+import token
 
 
 logger = logging.getLogger('discord')
@@ -25,4 +26,4 @@ async def on_message(message):
     if message.content.startswith("$hello"):
         await message.channel.send("Hello!")
 
-client.run("TOKEN")
+client.run(token.getToken())
