@@ -1,3 +1,4 @@
+import collections
 import datetime
 import random
 
@@ -6,9 +7,13 @@ import logging
 import bot_token
 import asyncio
 import database as db
+import name_tools as nt
 
-DROP_CHANCE = 0.04  # Currently 1/25 messages average
+DROP_CHANCE = 0.25  # Currently 1/25 messages average 0.04
 EMBED_COLOR = discord.Color.red()
+DROP_TIMEOUT = 30.0  # 3600.0
+PROFILE_TIMEOUT = 30.0
+PROFILE_PAGE_SIZE = 15
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -20,10 +25,21 @@ client = discord.Client()
 
 random.seed()
 
+NAVIGATION_EMOJI = {
+    "⬅": -1,
+    "➡": 1
+}
+
 
 @client.event
 async def on_ready():
-    print(f"We have logged in as {client.user}")
+    db.enableAllDrops()
+    print(f"Bot has logged in as {client.user}")
+
+
+@client.event
+async def on_guild_remove(guild):
+    db.removeGuild(guild.id)
 
 
 @client.event
@@ -31,29 +47,46 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    elif message.content.startswith("$ping"):
-        await message.channel.send("Pong!:ping_pong:")
+    if message.content.startswith("$ping"):
+        return await message.channel.send("Pong! :ping_pong:")
 
-    elif message.content.startswith("$assign"):
+    if message.content.startswith("$assign"):
         db.assignChannelToGuild(message.channel.id, message.guild.id)
         embed = makeEmbed("Channel Assigned!",
                           """I've been assigned to channel ``#{message.channel.name}``""")
-        await message.channel.send(embed=embed)
+        return await message.channel.send(embed=embed)
 
     # These should only happen in the assigned channel
-    elif message.channel.id == db.getAssignedChannelID(message.guild.id):
+    if message.channel.id == db.getAssignedChannelID(message.guild.id):
         if message.content.startswith("$waifus"):
-            waifus = db.getWaifus(message.author.id)
-            message_strings = []
-            for waifu in waifus:
-                message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
-            final_string = "\n".join(message_strings)
-            embed = makeEmbed(f"""{message.author.display_name}'s Waifus""",
-                              final_string)
-            await message.channel.send(embed=embed)
+            cur_page = 0
+            embed, total_pages = getWaifuPageEmbed(message.author, cur_page)
+            own_message = await message.channel.send(embed=embed)
+            await own_message.add_reaction("⬅")
+            await own_message.add_reaction("➡")
+
+            def isValidNavigation(r, u):
+                if u != client.user and r.message.id == own_message.id:
+                    if r.emoji in NAVIGATION_EMOJI:
+                        return True
+                return False
+
+            while True:
+                try:
+                    reaction, user = await client.wait_for("reaction_add", check=isValidNavigation, timeout=PROFILE_TIMEOUT)
+                except asyncio.TimeoutError:
+                    break
+                # Reaction received, edit message.
+                new_page = cur_page + NAVIGATION_EMOJI[reaction.emoji]
+                if not new_page < 0 and not new_page + 1 > total_pages:
+                    cur_page = new_page
+                    embed, total_pages = getWaifuPageEmbed(message.author, cur_page)
+                    await own_message.edit(embed=embed)
+                await own_message.remove_reaction(reaction, user)
+            return
 
     # Drops!
-    elif db.canDrop(message.guild.id):
+    if db.canDrop(message.guild.id):
         if random.random() < DROP_CHANCE:
             assigned_channel_id = db.getAssignedChannelID(message.guild.id)
             if assigned_channel_id:
@@ -63,24 +96,21 @@ async def on_message(message):
                 character_data = db.getDropData()
                 assigned_channel = client.get_channel(assigned_channel_id)
                 embed = makeEmbed("Waifu Drop!",
-                                  f"""A waifu dropped, guess their name!\nHint: ``{generateInitials(character_data)}``""")
+                                  f"""A waifu dropped, guess their name!\nHint: ``{nt.generateInitials(character_data)}``""")
                 embed.set_image(url=character_data["image_url"])
                 await assigned_channel.send(embed=embed)
 
                 def isCorrectGuess(m):
                     if m.channel.id == assigned_channel_id:
-                        print("correct channel")
                         if verifyGuess(m.clean_content, character_data):
-                            print("Correct")
                             return True
                         else:
-                            print("Wrong")
                             return False
                     else:
                         return False
 
                 try:
-                    guess = await client.wait_for("message", check=isCorrectGuess, timeout=10.0)
+                    guess = await client.wait_for("message", check=isCorrectGuess, timeout=DROP_TIMEOUT)
                 except asyncio.TimeoutError:
                     db.enableDrops(guild_id)
                     embed = makeEmbed("Timed Out!",
@@ -89,27 +119,40 @@ async def on_message(message):
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
                 db.saveWin(guess.author.id, character_data["image_id"])
-                embed = makeEmbed("Correct!",
-                                  f"""**{guess.author.display_name}** is correct!\nThat is **{character_data["en_name"]}**.""")
+                embed = makeEmbed("Waifu Claimed!",
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.""")
                 embed.set_image(url=character_data["image_url"])
-                await assigned_channel.send(embed=embed)
+                return await assigned_channel.send(embed=embed)
+
+    return
 
 
-def generateInitials(character_data):
-    char_name = character_data["en_name"]
-    out_string = ""
-    initials = [segment[0] for segment in char_name.split(" ")]
-    for initial in initials:
-        out_string += f"{initial}. "
-    return out_string.rstrip()
+def getWaifuPageEmbed(author, cur_page):
+    waifus, page_data = db.getWaifus(author.id, cur_page, PROFILE_PAGE_SIZE)
+    message_strings = []
+    for waifu in waifus:
+        message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
+    # Pad with empty strings (zero width spaces)
+    message_strings += ['\u200b'] * (PROFILE_PAGE_SIZE - len(waifus))
+    final_string = "\n".join(message_strings)
+    return makeEmbed(
+        f"""{author.display_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
+        final_string), page_data["total_pages"]
 
 
 def verifyGuess(guess_name, character_data):
-    # Generate synonyms here?
-    if guess_name.lower() == character_data["en_name"].lower():
-        return True
-    else:
-        return False
+    # Deal with random order of words.
+    # Most of the time it will be two, but with more, a random order would still count.
+    # This is a compromise. Most people won't try to guess with a random order
+    # and if they do, they still had to insert the full name regardless.
+    guess_segments = nt.nameToList(guess_name)
+    possible_names = [nt.nameToList(character_data["en_name"])]
+    if character_data["alt_name"]:
+        possible_names.append(nt.nameToList(character_data["alt_name"]))
+    for possible_name in possible_names:
+        if collections.Counter(guess_segments) == collections.Counter(possible_name):
+            return True
+    return False
 
 
 def makeEmbed(title, desciption):
@@ -118,5 +161,6 @@ def makeEmbed(title, desciption):
                          description=desciption,
                          color=EMBED_COLOR,
                          timestamp=datetime.datetime.utcnow())
+
 
 client.run(bot_token.getToken())

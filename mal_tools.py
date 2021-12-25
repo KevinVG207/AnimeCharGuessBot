@@ -14,8 +14,6 @@ def downloadCharacter(char_id):
     en_name, jp_name = full_name.split(" (")
     jp_name = jp_name.replace(")", "")
 
-    time.sleep(0.5)
-
     # Images
     image_page_url = None
     all_links = soup.find_all("a", href=True)
@@ -25,10 +23,14 @@ def downloadCharacter(char_id):
 
     image_urls = downloadImages(image_page_url)
 
-    return char_id, en_name, jp_name, image_urls
+    return {"char_id": char_id.strip(),
+            "en_name": en_name.strip(),
+            "jp_name": jp_name.strip(),
+            "image_urls": image_urls}
 
 
 def downloadImages(image_page_url):
+    time.sleep(0.5)
     image_page = requests.get(image_page_url)
     img_soup = BeautifulSoup(image_page.content, "html.parser")
 

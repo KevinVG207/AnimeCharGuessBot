@@ -22,18 +22,20 @@ def createDatabase():
     print("Finished setting up DB")
 
 
-def insertCharacter(char_data):
-    """TODO: Replace character if it already exists."""
-    char_id, en_name, jp_name, image_urls = char_data
+def insertCharacter(char_data, alt_name=None):
+    char_id = char_data["char_id"]
+    en_name = char_data["en_name"]
+    jp_name = char_data["jp_name"]
+    image_urls = char_data["image_urls"]
     print(f"Inserting character {en_name}")
     conn, cursor = getConnection()
 
-    cursor.execute("""INSERT INTO character (id, en_name, jp_name) VALUES (?,?,?)""", (char_id, en_name, jp_name))
+    cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""", (char_id, en_name, jp_name, alt_name))
 
     char_pk = cursor.lastrowid
 
     for image_url in image_urls:
-        cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?)""", (image_url, char_pk))
+        cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?);""", (image_url, char_pk))
 
     conn.commit()
     conn.close()
@@ -41,7 +43,7 @@ def insertCharacter(char_data):
 
 def guildExists(guild_id):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT id FROM guild WHERE id = ?""", (guild_id,))
+    cursor.execute("""SELECT id FROM guild WHERE id = ?;""", (guild_id,))
     rows = cursor.fetchall()
     conn.close()
     if not rows:
@@ -54,7 +56,7 @@ def guildExists(guild_id):
 
 def characterExists(char_id):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT id FROM character WHERE id = ?""", (char_id,))
+    cursor.execute("""SELECT id FROM character WHERE id = ?;""", (char_id,))
     rows = cursor.fetchall()
     conn.close()
     if not rows:
@@ -67,10 +69,10 @@ def assignChannelToGuild(channel_id, guild_id):
     conn, cursor = getConnection()
     if guildExists(guild_id):
         # Guild already exists, update channel.
-        cursor.execute("""UPDATE guild SET channel_id = ? WHERE id = ?""", (channel_id, guild_id))
+        cursor.execute("""UPDATE guild SET channel_id = ? WHERE id = ?;""", (channel_id, guild_id))
     else:
         # Guild does not exist, insert it.
-        cursor.execute("""INSERT INTO guild (id, channel_id) VALUES (?,?)""", (guild_id, channel_id))
+        cursor.execute("""INSERT INTO guild (id, channel_id) VALUES (?,?);""", (guild_id, channel_id))
     conn.commit()
     conn.close()
 
@@ -79,7 +81,7 @@ def getAssignedChannelID(guild_id):
     channel_id = None
 
     conn, cursor = getConnection()
-    cursor.execute("""SELECT channel_id FROM guild WHERE id = ?""", (guild_id,))
+    cursor.execute("""SELECT channel_id FROM guild WHERE id = ?;""", (guild_id,))
     rows = cursor.fetchall()
     conn.close()
     if rows and rows[0]:
@@ -90,7 +92,7 @@ def getAssignedChannelID(guild_id):
 
 def canDrop(guild_id):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT can_drop FROM guild WHERE id = ? AND can_drop = 1""", (guild_id,))
+    cursor.execute("""SELECT can_drop FROM guild WHERE id = ? AND can_drop = 1;""", (guild_id,))
     rows = cursor.fetchall()
     conn.close()
     if rows:
@@ -101,22 +103,24 @@ def canDrop(guild_id):
 
 def getDropData():
     conn, cursor = getConnection()
-    cursor.execute("""SELECT id FROM character""")
+    cursor.execute("""SELECT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
     random.shuffle(rows)
     char_id = rows[0][0]
-    cursor.execute("""SELECT url, en_name, images.id FROM character
+    cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character
     LEFT JOIN images ON character.id = images.character_id
-    WHERE character.id = ?;""", (char_id,))
+    WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     rows = cursor.fetchall()
     conn.close()
     random.shuffle(rows)
     image_url = rows[0][0]
     en_name = rows[0][1]
-    image_id = rows[0][2]
+    alt_name = rows[0][2]
+    image_id = rows[0][3]
     return {"char_id": char_id,
             "image_url": image_url,
             "en_name": en_name,
+            "alt_name": alt_name,
             "image_id": image_id}
 
 
@@ -134,13 +138,20 @@ def enableDrops(guild_id):
     conn.close()
 
 
+def enableAllDrops():
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE guild SET can_drop = 1;""")
+    conn.commit()
+    conn.close()
+
+
 def ensureUserExists(user_id):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT id FROM user WHERE id = ?""", (user_id,))
+    cursor.execute("""SELECT id FROM user WHERE id = ?;""", (user_id,))
     rows = cursor.fetchall()
     if not rows:
         # User does not exist
-        cursor.execute("""INSERT INTO user (id) VALUES (?)""", (user_id,))
+        cursor.execute("""INSERT INTO user (id) VALUES (?);""", (user_id,))
         conn.commit()
     conn.close()
 
@@ -148,13 +159,18 @@ def ensureUserExists(user_id):
 def saveWin(user_id, image_id):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""INSERT INTO user_img (user_id, images_id) VALUES (?,?)""", (user_id, image_id))
+    cursor.execute("""INSERT INTO user_img (user_id, images_id) VALUES (?,?);""", (user_id, image_id))
     conn.commit()
     conn.close()
-    print("Saved win!")
 
 
-def getWaifus(user_id):
+def divideWaifus(l, n):
+    # looping till length l
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
+
+def getWaifus(user_id, page_num, page_size):
     waifus = []
     ensureUserExists(user_id)
     conn, cursor = getConnection()
@@ -163,10 +179,20 @@ def getWaifus(user_id):
     LEFT JOIN images on user_img.images_id = images.id
     LEFT JOIN character c on images.character_id = c.id
     WHERE user_id = ?
-    GROUP BY character_id;""", (user_id,))
+    GROUP BY character_id
+    ORDER BY en_name ASC;""", (user_id,))
     rows = cursor.fetchall()
-    for row in rows:
+    conn.close()
+    pages = list(divideWaifus(rows, page_size))
+    page = pages[page_num]
+    for row in page:
         waifus.append({"en_name": row[0],
                        "amount": row[1]})
+    return waifus, {"cur_page": page_num, "total_pages": len(pages)}
+
+
+def removeGuild(guild_id):
+    conn, cursor = getConnection()
+    cursor.execute("""DELETE FROM guild WHERE id = ?;""", (guild_id,))
+    conn.commit()
     conn.close()
-    return waifus
