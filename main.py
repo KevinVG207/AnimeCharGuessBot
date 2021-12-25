@@ -12,7 +12,7 @@ DROP_CHANCE = 0.1  # Currently 1/25 messages average 0.04
 EMBED_COLOR = discord.Color.red()
 DROP_TIMEOUT = 900.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
-PROFILE_PAGE_SIZE = 15
+PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
 
 logger = logging.getLogger('discord')
@@ -25,9 +25,11 @@ client = discord.Client()
 
 random.seed()
 
-NAVIGATION_EMOJI = {
-    "⬅": -1,
-    "➡": 1
+NAV_LEFT_EMOJI = "⬅"
+NAV_RIGHT_EMOJI = "➡"
+NAV_EMOJI = {
+    NAV_LEFT_EMOJI: -1,
+    NAV_RIGHT_EMOJI: 1
 }
 
 
@@ -50,6 +52,8 @@ async def on_message(message):
     TODO: Gacha rolls.
     TODO: Viewing individual claimed images.
     TODO: w.waifus -p 4 -> Automatically go to pages (or max/minimum page if index out of range.)
+    TODO: Trading.
+    TODO: Add lots of characters!
     """
     if message.author == client.user:
         return
@@ -114,12 +118,12 @@ async def on_message(message):
             if total_pages < 0:
                 return await message.channel.send(embed=embed)
             own_message = await message.channel.send(embed=embed)
-            await own_message.add_reaction("⬅")
-            await own_message.add_reaction("➡")
+            await own_message.add_reaction(NAV_LEFT_EMOJI)
+            await own_message.add_reaction(NAV_RIGHT_EMOJI)
 
             def isValidNavigation(r, u):
                 if u != client.user and r.message.id == own_message.id and u.id == message.author.id:
-                    if r.emoji in NAVIGATION_EMOJI:
+                    if r.emoji in NAV_EMOJI:
                         return True
                 return False
 
@@ -129,7 +133,7 @@ async def on_message(message):
                 except asyncio.TimeoutError:
                     break
                 # Reaction received, edit message.
-                new_page = cur_page + NAVIGATION_EMOJI[reaction.emoji]
+                new_page = cur_page + NAV_EMOJI[reaction.emoji]
                 if not new_page < 0 and not new_page + 1 > total_pages:
                     cur_page = new_page
                     embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
@@ -174,9 +178,7 @@ async def on_message(message):
                 db.enableDrops(guild_id)
                 db.saveWin(guess.author.id, character_data["image_id"])
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!
-                                  You've claimed **{character_data["en_name"]}**.
-                                  [MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
                 return await assigned_channel.send(embed=embed)
 
@@ -188,7 +190,7 @@ def getWaifuPageEmbed(user_id, user_name, cur_page):
     message_strings = []
     if not waifus:
         return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
-    waifu_index = 0
+    waifu_index = cur_page * PROFILE_PAGE_SIZE
     for waifu in waifus:
         waifu_index += 1
         message_strings.append(f"""{waifu_index}: **{waifu["en_name"]}** #{waifu["image_index"]}""")
