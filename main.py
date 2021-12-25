@@ -1,7 +1,6 @@
 import collections
 import datetime
 import random
-
 import discord
 import logging
 import bot_token
@@ -9,11 +8,12 @@ import asyncio
 import database as db
 import name_tools as nt
 
-DROP_CHANCE = 0.25  # Currently 1/25 messages average 0.04
+DROP_CHANCE = 0.1  # Currently 1/25 messages average 0.04
 EMBED_COLOR = discord.Color.red()
-DROP_TIMEOUT = 30.0  # 3600.0
+DROP_TIMEOUT = 900.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 15
+PREFIX = "w."
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -35,6 +35,7 @@ NAVIGATION_EMOJI = {
 async def on_ready():
     db.enableAllDrops()
     print(f"Bot has logged in as {client.user}")
+    print([g.name for g in client.guilds])
 
 
 @client.event
@@ -44,29 +45,80 @@ async def on_guild_remove(guild):
 
 @client.event
 async def on_message(message):
+    """
+    TODO: Rarities.
+    TODO: Gacha rolls.
+    TODO: Viewing individual claimed images.
+    TODO: w.waifus -p 4 -> Automatically go to pages (or max/minimum page if index out of range.)
+    """
     if message.author == client.user:
         return
 
-    if message.content.startswith("$ping"):
+    if message.content == f"{PREFIX}ping":
         return await message.channel.send("Pong! :ping_pong:")
 
-    if message.content.startswith("$assign"):
-        db.assignChannelToGuild(message.channel.id, message.guild.id)
-        embed = makeEmbed("Channel Assigned!",
-                          """I've been assigned to channel ``#{message.channel.name}``""")
-        return await message.channel.send(embed=embed)
+    if message.content == f"{PREFIX}help":
+        help_commands = {
+            "help": "Show this help message.",
+            "ping": "Pong.",
+            "waifus": "View your collected waifus.",
+            "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)"
+        }
+        help_lines = []
+        for command, text in help_commands.items():
+            help_lines.append(f"**{PREFIX}{command}**: {text}")
+        return await message.channel.send(embed=makeEmbed("Bot Help", "\n".join(help_lines)))
+
+    # Assign bot to channel.
+    if message.content == f"{PREFIX}assign":
+        if message.channel.permissions_for(message.author).manage_channels:
+            db.assignChannelToGuild(message.channel.id, message.guild.id)
+            embed = makeEmbed("Channel Assigned!",
+                              f"""I've been assigned to channel ``#{message.channel.name}``""")
+            return await message.channel.send(embed=embed)
 
     # These should only happen in the assigned channel
     if message.channel.id == db.getAssignedChannelID(message.guild.id):
-        if message.content.startswith("$waifus"):
+        if message.content == f"{PREFIX}waifus" or message.content.startswith(f"{PREFIX}waifus "):
+            args = message.content.replace(f"{PREFIX}waifus", "").strip().split()
+
+            user_id = message.author.id
+            user_name = message.author.display_name
+
+            # Arguments
+            if args:
+                while len(args) > 0:
+                    cur_arg = args.pop(0)
+                    if not cur_arg.startswith("-") or cur_arg == "-u":
+                        if cur_arg.startswith("-"):
+                            user_arg = args.pop(0)
+                        else:
+                            user_arg = cur_arg
+                        if user_arg.startswith("<@!"):
+                            # It's a ping
+                            user_id = int(user_arg[3:-1])
+                        else:
+                            # Assume it's an ID
+                            user_id = user_arg
+                        try:
+                            # User in current Guild
+                            requested_member = await message.guild.fetch_member(user_id)
+                            user_name = requested_member.display_name
+                        except (discord.errors.NotFound, discord.errors.HTTPException):
+                            # User not in current Guild
+                            return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
+                                                                              "Requested user is not in this server."))
+
             cur_page = 0
-            embed, total_pages = getWaifuPageEmbed(message.author, cur_page)
+            embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+            if total_pages < 0:
+                return await message.channel.send(embed=embed)
             own_message = await message.channel.send(embed=embed)
             await own_message.add_reaction("⬅")
             await own_message.add_reaction("➡")
 
             def isValidNavigation(r, u):
-                if u != client.user and r.message.id == own_message.id:
+                if u != client.user and r.message.id == own_message.id and u.id == message.author.id:
                     if r.emoji in NAVIGATION_EMOJI:
                         return True
                 return False
@@ -80,7 +132,9 @@ async def on_message(message):
                 new_page = cur_page + NAVIGATION_EMOJI[reaction.emoji]
                 if not new_page < 0 and not new_page + 1 > total_pages:
                     cur_page = new_page
-                    embed, total_pages = getWaifuPageEmbed(message.author, cur_page)
+                    embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+                    if total_pages < 0:
+                        return await message.channel.send(embed=embed)
                     await own_message.edit(embed=embed)
                 await own_message.remove_reaction(reaction, user)
             return
@@ -102,7 +156,7 @@ async def on_message(message):
 
                 def isCorrectGuess(m):
                     if m.channel.id == assigned_channel_id:
-                        if verifyGuess(m.clean_content, character_data):
+                        if verifyGuess(m.content, character_data):
                             return True
                         else:
                             return False
@@ -127,16 +181,18 @@ async def on_message(message):
     return
 
 
-def getWaifuPageEmbed(author, cur_page):
-    waifus, page_data = db.getWaifus(author.id, cur_page, PROFILE_PAGE_SIZE)
+def getWaifuPageEmbed(user_id, user_name, cur_page):
+    waifus, page_data = db.getWaifus(user_id, cur_page, PROFILE_PAGE_SIZE)
     message_strings = []
+    if not waifus:
+        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
     for waifu in waifus:
         message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     # Pad with empty strings (zero width spaces)
-    message_strings += ['\u200b'] * (PROFILE_PAGE_SIZE - len(waifus))
+    # message_strings += ['\u200b'] * (PROFILE_PAGE_SIZE - len(waifus))
     final_string = "\n".join(message_strings)
     return makeEmbed(
-        f"""{author.display_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
+        f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
         final_string), page_data["total_pages"]
 
 

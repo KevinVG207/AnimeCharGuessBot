@@ -1,14 +1,6 @@
 import mal_tools as mal
 import database as db
 
-db.insertCharacter(mal.downloadCharacter(8128))
-db.insertCharacter(mal.downloadCharacter(25170))
-db.insertCharacter(mal.downloadCharacter(16192))
-db.insertCharacter(mal.downloadCharacter(25171))
-db.insertCharacter(mal.downloadCharacter(16193))
-db.insertCharacter(mal.downloadCharacter(25169))
-db.insertCharacter(mal.downloadCharacter(16194))
-
 quit()
 
 db.createDatabase()
@@ -28,3 +20,12 @@ db.insertCharacter(mal.downloadCharacter(64169))
 db.insertCharacter(mal.downloadCharacter(64165))
 db.insertCharacter(mal.downloadCharacter(22037))
 db.insertCharacter(mal.downloadCharacter(109213), "trash")
+db.insertCharacter(mal.downloadCharacter(8128))
+db.insertCharacter(mal.downloadCharacter(25170))
+db.insertCharacter(mal.downloadCharacter(16192))
+db.insertCharacter(mal.downloadCharacter(25171))
+db.insertCharacter(mal.downloadCharacter(16193))
+db.insertCharacter(mal.downloadCharacter(25169))
+db.insertCharacter(mal.downloadCharacter(16194))
+db.insertCharacter(mal.downloadCharacter(38940), "nae nae")
+db.insertCharacter(mal.downloadCharacter(110137))

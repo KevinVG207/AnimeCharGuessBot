@@ -159,7 +159,7 @@ def ensureUserExists(user_id):
 def saveWin(user_id, image_id):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""INSERT INTO user_img (user_id, images_id) VALUES (?,?);""", (user_id, image_id))
+    cursor.execute("""INSERT INTO waifus (user_id, images_id) VALUES (?,?);""", (user_id, image_id))
     conn.commit()
     conn.close()
 
@@ -175,8 +175,8 @@ def getWaifus(user_id, page_num, page_size):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
     cursor.execute("""SELECT en_name, COUNT(character_id)
-    FROM user_img
-    LEFT JOIN images on user_img.images_id = images.id
+    FROM waifus
+    LEFT JOIN images on waifus.images_id = images.id
     LEFT JOIN character c on images.character_id = c.id
     WHERE user_id = ?
     GROUP BY character_id
@@ -184,10 +184,11 @@ def getWaifus(user_id, page_num, page_size):
     rows = cursor.fetchall()
     conn.close()
     pages = list(divideWaifus(rows, page_size))
-    page = pages[page_num]
-    for row in page:
-        waifus.append({"en_name": row[0],
-                       "amount": row[1]})
+    if pages:
+        page = pages[page_num]
+        for row in page:
+            waifus.append({"en_name": row[0],
+                           "amount": row[1]})
     return waifus, {"cur_page": page_num, "total_pages": len(pages)}
 
 

@@ -23,7 +23,7 @@ def downloadCharacter(char_id):
 
     image_urls = downloadImages(image_page_url)
 
-    return {"char_id": char_id.strip(),
+    return {"char_id": char_id,
             "en_name": en_name.strip(),
             "jp_name": jp_name.strip(),
             "image_urls": image_urls}
