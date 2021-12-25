@@ -174,7 +174,9 @@ async def on_message(message):
                 db.enableDrops(guild_id)
                 db.saveWin(guess.author.id, character_data["image_id"])
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.""")
+                                  f"""**{guess.author.display_name}** is correct!
+                                  You've claimed **{character_data["en_name"]}**.
+                                  [MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
                 return await assigned_channel.send(embed=embed)
 
