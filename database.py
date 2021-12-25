@@ -32,10 +32,8 @@ def insertCharacter(char_data, alt_name=None):
 
     cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""", (char_id, en_name, jp_name, alt_name))
 
-    char_pk = cursor.lastrowid
-
     for image_url in image_urls:
-        cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?);""", (image_url, char_pk))
+        cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?);""", (image_url, char_id))
 
     conn.commit()
     conn.close()
@@ -174,13 +172,15 @@ def getWaifus(user_id, page_num, page_size):
     waifus = []
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""SELECT en_name, COUNT(character_id)
-    FROM waifus
-    LEFT JOIN images on waifus.images_id = images.id
-    LEFT JOIN character c on images.character_id = c.id
-    WHERE user_id = ?
-    GROUP BY character_id
-    ORDER BY en_name ASC;""", (user_id,))
+    cursor.execute("""SELECT en_name, s.image_index
+FROM waifus
+LEFT JOIN (SELECT w.id as id, c.en_name as en_name, w.row_num as image_index
+FROM character c
+LEFT JOIN (SELECT id, character_id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+ON w.character_id = c.id) s
+ON waifus.images_id = s.id
+WHERE waifus.user_id = ?
+ORDER BY waifus.id;""", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     pages = list(divideWaifus(rows, page_size))
@@ -188,7 +188,7 @@ def getWaifus(user_id, page_num, page_size):
         page = pages[page_num]
         for row in page:
             waifus.append({"en_name": row[0],
-                           "amount": row[1]})
+                           "image_index": row[1]})
     return waifus, {"cur_page": page_num, "total_pages": len(pages)}
 
 

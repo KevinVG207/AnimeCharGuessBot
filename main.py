@@ -188,10 +188,11 @@ def getWaifuPageEmbed(user_id, user_name, cur_page):
     message_strings = []
     if not waifus:
         return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
+    waifu_index = 0
     for waifu in waifus:
-        message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
-    # Pad with empty strings (zero width spaces)
-    # message_strings += ['\u200b'] * (PROFILE_PAGE_SIZE - len(waifus))
+        waifu_index += 1
+        message_strings.append(f"""{waifu_index}: **{waifu["en_name"]}** #{waifu["image_index"]}""")
+        # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     final_string = "\n".join(message_strings)
     return makeEmbed(
         f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
