@@ -25,10 +25,15 @@ def nameToList(name):
 
 
 def romanizationFix(segment):
-    replace_dict = {"oo": "o",
-                    "ou": "o",
-                    "uu": "u",
-                    "ii": "i"}
+    replace_dict = {
+        "sya": "sha",
+        "syo": "sho",
+        "syu": "shu",
+        "oo": "o",
+        "ou": "o",
+        "uu": "u",
+        "ii": "i",
+    }
     for before, after in replace_dict.items():
         segment = segment.replace(before, after)
     return segment

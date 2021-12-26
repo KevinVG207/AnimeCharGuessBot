@@ -5,3 +5,4 @@ __pycache__/
 database/
 
 bot_token.py
+discord.log

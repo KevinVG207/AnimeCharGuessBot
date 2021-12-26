@@ -55,6 +55,7 @@ async def on_message(message):
     TODO: Add lots of characters!
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
+    MAYBE: Connect characters with shows. Allow for character lookups in shows.
     """
     if message.author == client.user:
         return

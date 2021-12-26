@@ -2,8 +2,22 @@ import mal_tools as mal
 import database as db
 
 
+mal.downloadInsertAnimeCharacters("")
+mal.downloadInsertAnimeCharacters("")
+
 quit()
 
+mal.downloadInsertAnimeCharacters("")
+
+
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/11785/Haiyore_Nyaruko-san")
+mal.downloadInsertAnimeCharacters("mal.downloadInsertAnimeCharacters("")")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/27441/Show_By_Rock")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/32038/Show_By_Rock_")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/40763/Show_By_Rock_Mashumairesh")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/41520/Show_by_Rock_Stars")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/39681/D4DJ__First_Mix")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/39292/Princess_Connect_Re_Dive")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/13659/Ore_no_Imouto_ga_Konnani_Kawaii_Wake_ga_Nai")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/34798/Yuru_Camp%E2%96%B3")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/38474/Yuru_Camp%E2%96%B3_Season_2")
