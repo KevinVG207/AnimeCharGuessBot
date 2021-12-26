@@ -51,9 +51,10 @@ async def on_message(message):
     """
     TODO: Rarities.
     TODO: Gacha rolls.
-    TODO: Viewing individual claimed images.
+    TODO: Update help for w.inspect.
     TODO: Trading.
     TODO: Add lots of characters!
+    TODO: Add support for manga import.
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
     MAYBE: Connect characters with shows. Allow for character lookups in shows.
@@ -108,19 +109,53 @@ async def on_message(message):
                             user_arg = cur_arg
                         if user_arg.startswith("<@!"):
                             # It's a ping
-                            user_id = int(user_arg[3:-1])
+                            user_id = pingToID(user_arg)
                         else:
                             # Assume it's an ID
                             user_id = user_arg
                         try:
                             # User in current Guild
                             requested_member = await message.guild.fetch_member(user_id)
+                            user_id = requested_member.id
                             user_name = requested_member.display_name
                         except (discord.errors.NotFound, discord.errors.HTTPException):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
             return await showNormalWaifusPage(message, user_id, user_name, cur_page)
+        elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
+            args = message.content.replace(f"{PREFIX}inspect", "").strip().split()
+            user_id = message.author.id
+            inventory_index = 0
+            # Arguments
+            if not args:
+                return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                  f"Usage: {PREFIX}inspect [number] (optional: -u @ping/user_id)"))
+            else:
+                inventory_arg = args.pop(0)
+                if not inventory_arg.isnumeric():
+                    return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                      f"Usage: {PREFIX}inspect [number]"))
+                inventory_index = int(inventory_arg)
+                while len(args) > 0:
+                    cur_arg = args.pop(0)
+                    if cur_arg == "-u":
+                        user_arg = args.pop(0)
+                        if user_arg.startswith("<@!"):
+                            # It's a ping
+                            user_id = pingToID(user_arg)
+                        else:
+                            # Assume it's an ID
+                            user_id = user_arg
+                        try:
+                            # User in current Guild
+                            requested_member = await message.guild.fetch_member(user_id)
+                            user_id = requested_member.id
+                        except (discord.errors.NotFound, discord.errors.HTTPException):
+                            # User not in current Guild
+                            return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
+                                                                              "Requested user is not in this server."))
+            return await showClaimedWaifuDetail(message, user_id, inventory_index)
 
     # Drops!
     if db.canDrop(message.guild.id):
@@ -164,6 +199,10 @@ async def on_message(message):
     return
 
 
+def pingToID(ping_string):
+    return int(ping_string[3:-1])
+
+
 def calcDropChance(user_count):
     return min(0.1, (1 / (user_count / 10)))
 
@@ -192,7 +231,7 @@ def makeEmbed(title, desciption):
 
 
 async def showNormalWaifusPage(message, user_id, user_name, cur_page):
-    embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page)
     if total_pages < 0:
         return await message.channel.send(embed=embed)
     own_message = await message.channel.send(embed=embed)
@@ -214,7 +253,7 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page):
         new_page = cur_page + NAV_EMOJI[reaction.emoji]
         if not new_page < 0 and not new_page + 1 > total_pages:
             cur_page = new_page
-            embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page)
             if total_pages < 0:
                 return await message.channel.send(embed=embed)
             await own_message.edit(embed=embed)
@@ -224,6 +263,7 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page):
 
 def getWaifuPageEmbed(user_id, user_name, cur_page):
     waifus, page_data = db.getWaifus(user_id, cur_page, PROFILE_PAGE_SIZE)
+    cur_page = page_data["cur_page"]
     message_strings = []
     if not waifus:
         return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
@@ -235,7 +275,30 @@ def getWaifuPageEmbed(user_id, user_name, cur_page):
     final_string = "\n".join(message_strings)
     return makeEmbed(
         f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
-        final_string), page_data["total_pages"]
+        final_string), page_data["total_pages"], cur_page
 
+
+def clamp(n, minn, maxn):
+    return max(min(maxn, n), minn)
+
+
+async def showClaimedWaifuDetail(message, user_id, inventory_index):
+    total_waifus = int(db.getWaifuCount(user_id))
+    if total_waifus == 0:
+        return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""))
+    skip = clamp(inventory_index, 1, total_waifus) - 1
+    waifu_data = db.getWaifuOfUser(user_id, skip)
+    if not waifu_data:
+        return await message.channel.send(embed=makeEmbed("404 Waifu Not Found",
+                                                          f"""Something went wrong with retrieving the requested waifu."""))
+    description = f"""Character [{waifu_data["id"]}](https://myanimelist.net/character/{waifu_data["id"]})\n**{waifu_data["en_name"]}**\n"""
+    if waifu_data["jp_name"]:
+        description += f"""{waifu_data["jp_name"]}\n"""
+    description += f"""Image #{waifu_data["image_index"]}"""
+
+    embed = makeEmbed("Waifu Detail", description)
+    embed.set_image(url=waifu_data["image_url"])
+
+    return await message.channel.send(embed=embed)
 
 client.run(bot_token.getToken())

@@ -5,7 +5,7 @@ def generateInitials(character_data):
     char_name = character_data["en_name"].strip()
     out_string = ""
     try:
-        initials = [segment[0] for segment in char_name.split(" ")]
+        initials = [segment[0] for segment in char_name.split()]
     except IndexError:
         print("Initials error")
         print(character_data)

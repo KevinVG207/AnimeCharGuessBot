@@ -216,3 +216,52 @@ def removeGuild(guild_id):
     cursor.execute("""DELETE FROM guild WHERE id = ?;""", (guild_id,))
     conn.commit()
     conn.close()
+
+
+def getWaifuCount(user_id):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT COUNT() FROM waifus WHERE user_id = ? ORDER BY id;""", (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return 0
+    else:
+        return rows[0][0]
+
+
+def getWaifuImageIndex(waifu_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT s.image_index
+FROM waifus
+LEFT JOIN (SELECT w.id as id, c.en_name as en_name, w.row_num as image_index
+FROM character c
+LEFT JOIN (SELECT id, character_id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+ON w.character_id = c.id) s
+ON waifus.images_id = s.id
+WHERE waifus.id = ?;""", (waifu_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return -1
+    return rows[0][0]
+
+
+def getWaifuOfUser(user_id, skip):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT en_name, jp_name, character_id, url, waifus.id
+FROM waifus
+LEFT JOIN images i ON waifus.images_id = i.id
+LEFT JOIN character c ON i.character_id = c.id
+WHERE user_id = ?
+LIMIT ?, 1;""", (user_id, skip))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return None
+    return {"en_name": rows[0][0],
+            "jp_name": rows[0][1],
+            "id": rows[0][2],
+            "image_url": rows[0][3],
+            "image_index": getWaifuImageIndex(rows[0][4])}
