@@ -22,6 +22,7 @@ handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 client = discord.Client()
+client.intents.members = True
 
 random.seed()
 
@@ -123,7 +124,7 @@ async def on_message(message):
 
     # Drops!
     if db.canDrop(message.guild.id):
-        if random.random() < DROP_CHANCE:
+        if random.random() < calcDropChance(message.guild.member_count):
             assigned_channel_id = db.getAssignedChannelID(message.guild.id)
             if assigned_channel_id:
                 # Drop should happen!
@@ -161,6 +162,10 @@ async def on_message(message):
                 return await assigned_channel.send(embed=embed)
 
     return
+
+
+def calcDropChance(user_count):
+    return min(0.1, (1 / (user_count / 10)))
 
 
 def verifyGuess(guess_name, character_data):

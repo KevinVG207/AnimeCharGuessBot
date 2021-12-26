@@ -2,9 +2,6 @@ import mal_tools as mal
 import database as db
 
 
-mal.downloadInsertAnimeCharacters("")
-mal.downloadInsertAnimeCharacters("")
-
 quit()
 
 mal.downloadInsertAnimeCharacters("")
