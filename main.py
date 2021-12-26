@@ -10,7 +10,7 @@ import name_tools as nt
 
 DROP_CHANCE = 0.1  # Currently 1/25 messages average 0.04
 EMBED_COLOR = discord.Color.red()
-DROP_TIMEOUT = 900.0  # 3600.0
+DROP_TIMEOUT = 5 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
@@ -51,9 +51,10 @@ async def on_message(message):
     TODO: Rarities.
     TODO: Gacha rolls.
     TODO: Viewing individual claimed images.
-    TODO: w.waifus -p 4 -> Automatically go to pages (or max/minimum page if index out of range.)
     TODO: Trading.
     TODO: Add lots of characters!
+    TODO: Add update functions for character and images in database.
+    MAYBE: w.skip to skip drop *based* on the amount of online members.
     """
     if message.author == client.user:
         return
@@ -75,7 +76,7 @@ async def on_message(message):
 
     # Assign bot to channel.
     if message.content == f"{PREFIX}assign":
-        if message.channel.permissions_for(message.author).manage_channels:
+        if message.channel.permissions_for(message.author).administrator:
             db.assignChannelToGuild(message.channel.id, message.guild.id)
             embed = makeEmbed("Channel Assigned!",
                               f"""I've been assigned to channel ``#{message.channel.name}``""")
@@ -88,12 +89,17 @@ async def on_message(message):
 
             user_id = message.author.id
             user_name = message.author.display_name
+            cur_page = 0
 
             # Arguments
             if args:
                 while len(args) > 0:
                     cur_arg = args.pop(0)
-                    if not cur_arg.startswith("-") or cur_arg == "-u":
+                    if cur_arg.startswith("-p"):
+                        page_arg = args.pop(0)
+                        if page_arg.isnumeric():
+                            cur_page = int(page_arg) - 1
+                    elif not cur_arg.startswith("-") or cur_arg == "-u":
                         if cur_arg.startswith("-"):
                             user_arg = args.pop(0)
                         else:
@@ -112,36 +118,7 @@ async def on_message(message):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
-
-            cur_page = 0
-            embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
-            if total_pages < 0:
-                return await message.channel.send(embed=embed)
-            own_message = await message.channel.send(embed=embed)
-            await own_message.add_reaction(NAV_LEFT_EMOJI)
-            await own_message.add_reaction(NAV_RIGHT_EMOJI)
-
-            def isValidNavigation(r, u):
-                if u != client.user and r.message.id == own_message.id and u.id == message.author.id:
-                    if r.emoji in NAV_EMOJI:
-                        return True
-                return False
-
-            while True:
-                try:
-                    reaction, user = await client.wait_for("reaction_add", check=isValidNavigation, timeout=PROFILE_TIMEOUT)
-                except asyncio.TimeoutError:
-                    break
-                # Reaction received, edit message.
-                new_page = cur_page + NAV_EMOJI[reaction.emoji]
-                if not new_page < 0 and not new_page + 1 > total_pages:
-                    cur_page = new_page
-                    embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
-                    if total_pages < 0:
-                        return await message.channel.send(embed=embed)
-                    await own_message.edit(embed=embed)
-                await own_message.remove_reaction(reaction, user)
-            return
+            return await showNormalWaifusPage(message, user_id, user_name, cur_page)
 
     # Drops!
     if db.canDrop(message.guild.id):
@@ -185,22 +162,6 @@ async def on_message(message):
     return
 
 
-def getWaifuPageEmbed(user_id, user_name, cur_page):
-    waifus, page_data = db.getWaifus(user_id, cur_page, PROFILE_PAGE_SIZE)
-    message_strings = []
-    if not waifus:
-        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
-    waifu_index = cur_page * PROFILE_PAGE_SIZE
-    for waifu in waifus:
-        waifu_index += 1
-        message_strings.append(f"""{waifu_index}: **{waifu["en_name"]}** #{waifu["image_index"]}""")
-        # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
-    final_string = "\n".join(message_strings)
-    return makeEmbed(
-        f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
-        final_string), page_data["total_pages"]
-
-
 def verifyGuess(guess_name, character_data):
     # Deal with random order of words.
     # Most of the time it will be two, but with more, a random order would still count.
@@ -222,6 +183,53 @@ def makeEmbed(title, desciption):
                          description=desciption,
                          color=EMBED_COLOR,
                          timestamp=datetime.datetime.utcnow())
+
+
+async def showNormalWaifusPage(message, user_id, user_name, cur_page):
+    embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+    if total_pages < 0:
+        return await message.channel.send(embed=embed)
+    own_message = await message.channel.send(embed=embed)
+    await own_message.add_reaction(NAV_LEFT_EMOJI)
+    await own_message.add_reaction(NAV_RIGHT_EMOJI)
+
+    def isValidNavigation(r, u):
+        if u != client.user and r.message.id == own_message.id and u.id == message.author.id:
+            if r.emoji in NAV_EMOJI:
+                return True
+        return False
+
+    while True:
+        try:
+            reaction, user = await client.wait_for("reaction_add", check=isValidNavigation, timeout=PROFILE_TIMEOUT)
+        except asyncio.TimeoutError:
+            break
+        # Reaction received, edit message.
+        new_page = cur_page + NAV_EMOJI[reaction.emoji]
+        if not new_page < 0 and not new_page + 1 > total_pages:
+            cur_page = new_page
+            embed, total_pages = getWaifuPageEmbed(user_id, user_name, cur_page)
+            if total_pages < 0:
+                return await message.channel.send(embed=embed)
+            await own_message.edit(embed=embed)
+        await own_message.remove_reaction(reaction, user)
+    return
+
+
+def getWaifuPageEmbed(user_id, user_name, cur_page):
+    waifus, page_data = db.getWaifus(user_id, cur_page, PROFILE_PAGE_SIZE)
+    message_strings = []
+    if not waifus:
+        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
+    waifu_index = cur_page * PROFILE_PAGE_SIZE
+    for waifu in waifus:
+        waifu_index += 1
+        message_strings.append(f"""{waifu_index}: **{waifu["en_name"]}** #{waifu["image_index"]}""")
+        # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
+    final_string = "\n".join(message_strings)
+    return makeEmbed(
+        f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
+        final_string), page_data["total_pages"]
 
 
 client.run(bot_token.getToken())

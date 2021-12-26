@@ -1,6 +1,7 @@
 import random
 import sqlite3
 
+
 DATABASE_URI = "database/database.db"
 
 
@@ -22,12 +23,26 @@ def createDatabase():
     print("Finished setting up DB")
 
 
+def bulkInsertCharacter(character_data_list):
+    for character_data in character_data_list:
+        insertCharacter(character_data)
+
+
 def insertCharacter(char_data, alt_name=None):
     char_id = char_data["char_id"]
     en_name = char_data["en_name"]
     jp_name = char_data["jp_name"]
     image_urls = char_data["image_urls"]
-    print(f"Inserting character {en_name}")
+
+    if characterExists(char_id):
+        print(f"Character {char_id} {en_name} already exists in the database.")
+        return
+
+    if not image_urls:
+        print(f"Character {char_id} {en_name} does not have any images. Skipping.")
+        return
+
+    print(f"Inserting character {char_id} {en_name}")
     conn, cursor = getConnection()
 
     cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""", (char_id, en_name, jp_name, alt_name))
@@ -185,6 +200,10 @@ ORDER BY waifus.id;""", (user_id,))
     conn.close()
     pages = list(divideWaifus(rows, page_size))
     if pages:
+        if page_num < 0:
+            page_num = 0
+        elif page_num - 1 >= len(pages):
+            page_num = len(pages) - 1
         page = pages[page_num]
         for row in page:
             waifus.append({"en_name": row[0],

@@ -1,3 +1,6 @@
+from unidecode import unidecode
+
+
 def generateInitials(character_data):
     char_name = character_data["en_name"].strip()
     out_string = ""
@@ -16,7 +19,7 @@ def nameToList(name):
     name_list = name.strip().split()
     out_list = []
     for segment in name_list:
-        segment = "".join(char for char in segment.lower() if char.isalnum())
+        segment = "".join(char for char in unidecode(segment.lower()) if char.isalnum())
         out_list.append(romanizationFix(segment))
     return out_list
 
