@@ -53,7 +53,7 @@ async def on_message(message):
     TODO: Gacha rolls.
     TODO: Trading.
     TODO: Add lots of characters!
-    TODO: Connect characters with shows. Allow for character lookups in shows.
+    TODO: Allow for character lookups in shows.
     TODO: Add support for manga import.
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.

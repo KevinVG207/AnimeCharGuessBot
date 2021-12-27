@@ -4,41 +4,63 @@ import time
 import database as db
 
 
-def getAnimeURLSegment(anime_url):
-    return anime_url.split("myanimelist.net/anime/")[1] if "myanimelist.net/anime/" in anime_url else None
+def getShowURLSegment(show_url):
+    no_domain = show_url.split("myanimelist.net/")[1]
+    if no_domain.startswith("anime/"):
+        is_manga = False
+    elif no_domain.startswith("manga/"):
+        is_manga = True
+    else:
+        print("Error: Not a valid MAL anime/manga URL!")
+        return None, None
+    return no_domain.split("/", 1)[1], is_manga
 
 
-def getAnimeID(anime_url):
-    anime_url_segment = getAnimeURLSegment(anime_url)
-    if anime_url_segment:
-        anime_id = anime_url_segment.split("/")[0]
-        if anime_id.isnumeric():
-            return int(anime_id)
+def getShowID(show_url):
+    show_url_segment, is_manga = getShowURLSegment(show_url)
+    if show_url_segment:
+        show_id = show_url_segment.split("/")[0]
+        if show_id.isnumeric():
+            return int(show_id)
     return None
 
 
-def downloadInsertAnimeCharacters(anime_url, overwrite=False):
-    anime_url_segment = getAnimeURLSegment(anime_url)
-    anime_id = getAnimeID(anime_url)
-    print(anime_url_segment)
+def downloadInsertShowCharacters(show_url, overwrite=False):
+    show_url_segment, is_manga = getShowURLSegment(show_url)
+    mal_id = getShowID(show_url)
+    if not show_url_segment or not mal_id:
+        print("Error, show url not found.")
+        return -1
+    print(show_url_segment)
     time.sleep(1)
-    page = requests.get(f"https://myanimelist.net/anime/{anime_url_segment}/characters")
+    page = requests.get(f"{show_url}/characters")
     soup = BeautifulSoup(page.content, "html.parser")
 
-    jp_title_element = soup.find("h1", class_="title-name")
+    if not is_manga:
+        jp_title_element = soup.find("h1", class_="title-name")
+    else:
+        jp_title_element = soup.find("span", itemprop="name")
     if not jp_title_element:
-        print(f"[ERR] Could not find JP Anime Title for {anime_url_segment}")
+        print(f"[ERR] Could not find JP Anime Title for {show_url_segment}")
         return -1
     jp_title = jp_title_element.text
     en_title_element = soup.find("p", class_="title-english")
     en_title = en_title_element.text if en_title_element else None
 
-    if not db.showExistsByMAL(anime_id, False):
-        db.insertShow(anime_id, jp_title, en_title, False)
+    if is_manga:
+        if jp_title_element.find("span", class_="title-english"):
+            jp_title = jp_title_element.contents[0]
+            en_title = jp_title_element.find("span", class_="title-english").text
 
-    show_id = db.getShowIDByMAL(anime_id, False)
+    if not db.showExistsByMAL(mal_id, is_manga):
+        db.insertShow(mal_id, jp_title, en_title, is_manga)
 
-    character_tables = soup.find_all("table", class_="js-anime-character-table")
+    show_id = db.getShowIDByMAL(mal_id, is_manga)
+
+    if not is_manga:
+        character_tables = soup.find_all("table", class_="js-anime-character-table")
+    else:
+        character_tables = soup.find_all("table", class_="js-manga-character-table")
 
     character_count = len(character_tables)
     print(f"Found {character_count} characters.")
