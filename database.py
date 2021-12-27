@@ -78,6 +78,28 @@ def characterExists(char_id):
         return True
 
 
+def showExistsByMAL(mal_id, is_manga):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT id FROM show WHERE mal_id = ? AND is_manga = ?;""", (mal_id, is_manga))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return False
+    else:
+        return True
+
+
+def showExists(show_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT id FROM show WHERE id = ?;""", (show_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return False
+    else:
+        return True
+
+
 def assignChannelToGuild(channel_id, guild_id):
     conn, cursor = getConnection()
     if guildExists(guild_id):
@@ -265,3 +287,53 @@ LIMIT ?, 1;""", (user_id, skip))
             "id": rows[0][2],
             "image_url": rows[0][3],
             "image_index": getWaifuImageIndex(rows[0][4])}
+
+
+def insertShow(mal_id, jp_title, en_title, is_manga):
+    conn, cursor = getConnection()
+    print(f"Inserting show {mal_id} {en_title}, is_manga: {is_manga}")
+
+    cursor.execute("""INSERT INTO show (mal_id, jp_title, en_title, is_manga) VALUES (?,?,?,?)""", (mal_id, jp_title, en_title, is_manga))
+
+    conn.commit()
+    conn.close()
+
+
+def getShowIDByMAL(mal_id, is_manga):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT id FROM show WHERE mal_id = ? AND is_manga = ?;""", (mal_id, is_manga))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return None
+    else:
+        return rows[0][0]
+
+
+def characterHasShow(char_id, show_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT id FROM show_character WHERE char_id = ? AND show_id = ?;""", (char_id, show_id))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return False
+    else:
+        return True
+
+
+def addShowToCharacter(char_id, show_id):
+    conn, cursor = getConnection()
+    print(f"Adding show {show_id} to character {char_id}")
+    cursor.execute("""INSERT INTO show_character (char_id, show_id) VALUES (?,?);""", (char_id, show_id))
+    conn.commit()
+    conn.close()
+
+
+def getCharactersWithoutShows():
+    conn, cursor = getConnection()
+    cursor.execute("""select * from character
+left join show_character sc on character.id = sc.char_id
+where sc.id is null;""")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows

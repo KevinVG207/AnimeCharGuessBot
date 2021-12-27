@@ -1,17 +1,19 @@
 import mal_tools as mal
 import database as db
 
-
-mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/38009/Re_Stage_Dream_Days%E2%99%AA")
-
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/39071/Machikado_Mazoku")
 quit()
 
 mal.downloadInsertAnimeCharacters("")
 
-
-mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/11785/Haiyore_Nyaruko-san")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/623/Shichinin_no_Nana")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/30831/Kono_Subarashii_Sekai_ni_Shukufuku_wo")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/32937/Kono_Subarashii_Sekai_ni_Shukufuku_wo_2")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/27441/Show_By_Rock")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/32038/Show_By_Rock_")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/38009/Re_Stage_Dream_Days%E2%99%AA")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/11785/Haiyore_Nyaruko-san")
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/15699/Haiyore_Nyaruko-san_W")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/40763/Show_By_Rock_Mashumairesh")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/41520/Show_by_Rock_Stars")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/39681/D4DJ__First_Mix")
@@ -78,7 +80,7 @@ db.insertCharacter(mal.downloadCharacter(64173))
 db.insertCharacter(mal.downloadCharacter(64169))
 db.insertCharacter(mal.downloadCharacter(64165))
 db.insertCharacter(mal.downloadCharacter(22037))
-db.insertCharacter(mal.downloadCharacter(109213), "trash")
+db.insertCharacter(mal.downloadCharacter(109213), alt_name="trash")
 db.insertCharacter(mal.downloadCharacter(8128))
 db.insertCharacter(mal.downloadCharacter(25170))
 db.insertCharacter(mal.downloadCharacter(16192))
@@ -86,5 +88,5 @@ db.insertCharacter(mal.downloadCharacter(25171))
 db.insertCharacter(mal.downloadCharacter(16193))
 db.insertCharacter(mal.downloadCharacter(25169))
 db.insertCharacter(mal.downloadCharacter(16194))
-db.insertCharacter(mal.downloadCharacter(38940), "nae nae")
+db.insertCharacter(mal.downloadCharacter(38940), alt_name="nae nae")
 db.insertCharacter(mal.downloadCharacter(110137))

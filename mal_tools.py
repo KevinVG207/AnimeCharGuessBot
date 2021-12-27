@@ -8,12 +8,35 @@ def getAnimeURLSegment(anime_url):
     return anime_url.split("myanimelist.net/anime/")[1] if "myanimelist.net/anime/" in anime_url else None
 
 
+def getAnimeID(anime_url):
+    anime_url_segment = getAnimeURLSegment(anime_url)
+    if anime_url_segment:
+        anime_id = anime_url_segment.split("/")[0]
+        if anime_id.isnumeric():
+            return int(anime_id)
+    return None
+
+
 def downloadInsertAnimeCharacters(anime_url, overwrite=False):
     anime_url_segment = getAnimeURLSegment(anime_url)
+    anime_id = getAnimeID(anime_url)
     print(anime_url_segment)
     time.sleep(1)
     page = requests.get(f"https://myanimelist.net/anime/{anime_url_segment}/characters")
     soup = BeautifulSoup(page.content, "html.parser")
+
+    jp_title_element = soup.find("h1", class_="title-name")
+    if not jp_title_element:
+        print(f"[ERR] Could not find JP Anime Title for {anime_url_segment}")
+        return -1
+    jp_title = jp_title_element.text
+    en_title_element = soup.find("p", class_="title-english")
+    en_title = en_title_element.text if en_title_element else None
+
+    if not db.showExistsByMAL(anime_id, False):
+        db.insertShow(anime_id, jp_title, en_title, False)
+
+    show_id = db.getShowIDByMAL(anime_id, False)
 
     character_tables = soup.find_all("table", class_="js-anime-character-table")
 
@@ -26,9 +49,15 @@ def downloadInsertAnimeCharacters(anime_url, overwrite=False):
         if not overwrite:
             # Check if already exists and ignore if so.
             if db.characterExists(character_id):
-                print(f"Character {character_id} already exists.")
-                continue
+                if db.characterHasShow(character_id, show_id):
+                    print(f"Character {character_id} already exists.")
+                    continue
+                else:
+                    # Add show to character.
+                    db.addShowToCharacter(character_id, show_id)
+                    continue
         db.insertCharacter(downloadCharacterFromURL(character_url["href"]))
+        db.addShowToCharacter(character_id, show_id)
 
 
 def getCharacterIDFromURL(character_url):
