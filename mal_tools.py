@@ -31,7 +31,6 @@ def downloadInsertAnimeCharacters(anime_url, overwrite=False):
         db.insertCharacter(downloadCharacterFromURL(character_url["href"]))
 
 
-
 def getCharacterIDFromURL(character_url):
     return character_url.split("myanimelist.net/character/")[1].split("/")[0]
 

@@ -177,10 +177,10 @@ def saveWin(user_id, image_id):
     conn.close()
 
 
-def divideWaifus(l, n):
+def divideWaifus(waifus_list, chunk_size):
     # looping till length l
-    for i in range(0, len(l), n):
-        yield l[i:i + n]
+    for i in range(0, len(waifus_list), chunk_size):
+        yield waifus_list[i:i + chunk_size]
 
 
 def getWaifus(user_id, page_num, page_size):

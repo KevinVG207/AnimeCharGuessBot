@@ -51,13 +51,12 @@ async def on_message(message):
     """
     TODO: Rarities.
     TODO: Gacha rolls.
-    TODO: Update help for w.inspect.
     TODO: Trading.
     TODO: Add lots of characters!
+    TODO: Connect characters with shows. Allow for character lookups in shows.
     TODO: Add support for manga import.
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
-    MAYBE: Connect characters with shows. Allow for character lookups in shows.
     """
     if message.author == client.user:
         return
@@ -65,17 +64,33 @@ async def on_message(message):
     if message.content == f"{PREFIX}ping":
         return await message.channel.send("Pong! :ping_pong:")
 
-    if message.content == f"{PREFIX}help":
-        help_commands = {
-            "help": "Show this help message.",
-            "ping": "Pong.",
-            "waifus": "View your collected waifus.",
-            "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)"
-        }
-        help_lines = []
-        for command, text in help_commands.items():
-            help_lines.append(f"**{PREFIX}{command}**: {text}")
-        return await message.channel.send(embed=makeEmbed("Bot Help", "\n".join(help_lines)))
+    if message.content == f"{PREFIX}help" or message.content.startswith(f"{PREFIX}help "):
+        args = getMessageArgs("help", message)
+
+        if not args:
+            # Simple help
+            help_commands = {
+                "help": f"Show this help message. Use {PREFIX}help [command] to get help for a specific command.",
+                "ping": "Pong.",
+                "waifus": "View your collected waifus.",
+                "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)"
+            }
+            help_lines = []
+            for command, text in help_commands.items():
+                help_lines.append(f"**{PREFIX}{command}**: {text}")
+            return await message.channel.send(embed=makeEmbed("Bot Help", "\n".join(help_lines)))
+        else:
+            # Help for specific command.
+            embed_title = "No extra help available."
+            embed_description = "This command has no additional help available."
+            specific_command = args[0]
+            if specific_command == "waifus":
+                embed_title = f"Help for {PREFIX}waifus"
+                embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -p [page number]``"
+            elif specific_command == "inspect":
+                embed_title = f"Help for {PREFIX}inspect"
+                embed_description = f"Inspect a waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
+            return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
     if message.content == f"{PREFIX}assign":
@@ -88,7 +103,7 @@ async def on_message(message):
     # These should only happen in the assigned channel
     if message.channel.id == db.getAssignedChannelID(message.guild.id):
         if message.content == f"{PREFIX}waifus" or message.content.startswith(f"{PREFIX}waifus "):
-            args = message.content.replace(f"{PREFIX}waifus", "").strip().split()
+            args = getMessageArgs("waifus", message)
 
             user_id = message.author.id
             user_name = message.author.display_name
@@ -124,7 +139,7 @@ async def on_message(message):
                                                                               "Requested user is not in this server."))
             return await showNormalWaifusPage(message, user_id, user_name, cur_page)
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
-            args = message.content.replace(f"{PREFIX}inspect", "").strip().split()
+            args = getMessageArgs("inspect", message)
             user_id = message.author.id
             inventory_index = 0
             # Arguments
@@ -300,5 +315,10 @@ async def showClaimedWaifuDetail(message, user_id, inventory_index):
     embed.set_image(url=waifu_data["image_url"])
 
     return await message.channel.send(embed=embed)
+
+
+def getMessageArgs(command, message):
+    return message.content.replace(f"{PREFIX}{command}", "").strip().split()
+
 
 client.run(bot_token.getToken())

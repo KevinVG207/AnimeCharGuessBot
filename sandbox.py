@@ -2,13 +2,14 @@ import mal_tools as mal
 import database as db
 
 
+mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/38009/Re_Stage_Dream_Days%E2%99%AA")
+
 quit()
 
 mal.downloadInsertAnimeCharacters("")
 
 
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/11785/Haiyore_Nyaruko-san")
-mal.downloadInsertAnimeCharacters("mal.downloadInsertAnimeCharacters("")")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/27441/Show_By_Rock")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/32038/Show_By_Rock_")
 mal.downloadInsertAnimeCharacters("https://myanimelist.net/anime/40763/Show_By_Rock_Mashumairesh")
