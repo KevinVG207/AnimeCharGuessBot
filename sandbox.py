@@ -1,13 +1,19 @@
 import mal_tools as mal
-import database as db
+import database_tools as db
 
-mal.downloadInsertShowCharacters("https://myanimelist.net/manga/123450/Saikin_Yatotta_Maid_ga_Ayashii")
+
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/42653/Aikatsu_Planet")
+
 quit()
 
 mal.downloadInsertShowCharacters("")
 
+mal.downloadInsertShowCharacters("https://myanimelist.net/manga/123450/Saikin_Yatotta_Maid_ga_Ayashii")
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/138079/Genshin_Comic_Anthology")
 
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/44275/Selection_Project")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/40842/Idoly_Pride")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/40148/22_7")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/39071/Machikado_Mazoku")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/623/Shichinin_no_Nana")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/30831/Kono_Subarashii_Sekai_ni_Shukufuku_wo")

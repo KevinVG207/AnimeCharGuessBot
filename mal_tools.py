@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import time
-import database as db
+import database_tools as db
 
 
 def getShowURLSegment(show_url):
@@ -92,7 +92,7 @@ def downloadCharacterFromURL(character_url):
 
 def downloadCharacter(char_id):
     print(f"Downloading character {char_id}", end=" ")
-    time.sleep(1)
+    time.sleep(2)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")

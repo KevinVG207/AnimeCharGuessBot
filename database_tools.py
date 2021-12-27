@@ -337,3 +337,58 @@ where sc.id is null;""")
     rows = cursor.fetchall()
     conn.close()
     return rows
+
+
+def getShowsLike(search_query):
+    conn, cursor = getConnection()
+    wildcard_query = f"%{search_query}%"
+    cursor.execute("""SELECT id, jp_title, is_manga FROM show WHERE jp_title LIKE ? or en_title LIKE ? LIMIT 25""", (wildcard_query, wildcard_query))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return None
+    else:
+        shows_list = []
+        for row in rows:
+            shows_list.append({
+                "id": row[0],
+                "jp_title": row[1],
+                "is_manga": row[2]
+            })
+        return shows_list
+
+
+def getShowTitleJP(show_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT jp_title FROM show WHERE id = ?""", (show_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return None
+    if rows:
+        return rows[0][0]
+
+
+def getCharactersFromShow(show_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT s.char_id, s.en_name, COUNT(s.char_id) FROM images i
+INNER JOIN (
+    SELECT sc.char_id, c.en_name FROM show_character sc
+    LEFT JOIN character c ON sc.char_id = c.id
+    WHERE sc.show_id = ?
+    ) s ON s.char_id = i.character_id
+GROUP BY s.char_id
+ORDER BY s.en_name;""", (show_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return None
+    else:
+        char_list = []
+        for row in rows:
+            char_list.append({
+                "char_id": row[0],
+                "en_name": row[1],
+                "image_count": row[2]
+            })
+        return char_list

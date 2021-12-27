@@ -5,7 +5,7 @@ import discord
 import logging
 import bot_token
 import asyncio
-import database as db
+import database_tools as db
 import name_tools as nt
 
 DROP_CHANCE = 0.1  # Currently 1/25 messages average 0.04
@@ -16,7 +16,7 @@ PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
 
 logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
 handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s"))
 logger.addHandler(handler)
@@ -73,11 +73,13 @@ async def on_message(message):
                 "help": f"Show this help message. Use {PREFIX}help [command] to get help for a specific command.",
                 "ping": "Pong.",
                 "waifus": "View your collected waifus.",
+                "search": "Find a show.",
+                "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)"
             }
             help_lines = []
             for command, text in help_commands.items():
-                help_lines.append(f"**{PREFIX}{command}**: {text}")
+                help_lines.append(f"**{command}**: {text}")
             return await message.channel.send(embed=makeEmbed("Bot Help", "\n".join(help_lines)))
         else:
             # Help for specific command.
@@ -90,6 +92,12 @@ async def on_message(message):
             elif specific_command == "inspect":
                 embed_title = f"Help for {PREFIX}inspect"
                 embed_description = f"Inspect a waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
+            elif specific_command == "search":
+                embed_title = f"Help for {PREFIX}search"
+                embed_description = f"Look for shows that the bot has characters of.\nUsage: ``{PREFIX}search [anime/manga name]``"
+            elif specific_command == "show":
+                embed_title = f"Help for {PREFIX}show"
+                embed_description = f"Displays the characters of a show that the bot has.\nUsage: ``{PREFIX}show [show id]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -138,6 +146,7 @@ async def on_message(message):
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
             return await showNormalWaifusPage(message, user_id, user_name, cur_page)
+
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
             args = getMessageArgs("inspect", message)
             user_id = message.author.id
@@ -145,12 +154,12 @@ async def on_message(message):
             # Arguments
             if not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                  f"Usage: {PREFIX}inspect [number] (optional: -u @ping/user_id)"))
+                                                  f"Usage: ``{PREFIX}inspect [number] (optional: -u @ping/user_id)``"))
             else:
                 inventory_arg = args.pop(0)
                 if not inventory_arg.isnumeric():
                     return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                      f"Usage: {PREFIX}inspect [number]"))
+                                                                      f"Usage: ``{PREFIX}inspect [number]``"))
                 inventory_index = int(inventory_arg)
                 while len(args) > 0:
                     cur_arg = args.pop(0)
@@ -171,6 +180,44 @@ async def on_message(message):
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
             return await showClaimedWaifuDetail(message, user_id, inventory_index)
+
+        elif message.content == f"{PREFIX}search" or message.content.startswith(f"{PREFIX}search "):
+            if not message.content.startswith(f"{PREFIX}search "):
+                return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                  f"Usage: ``{PREFIX}search [anime/manga name]``"))
+            else:
+                show_query = message.content.split(" ", 1)[1]
+                if len(show_query) < 3:
+                    return await message.channel.send(embed=makeEmbed("Query too short.",
+                                                                      f"The search query must be 3 or more letters."))
+                shows_list = db.getShowsLike(show_query)
+                if not shows_list:
+                    return await message.channel.send(embed=makeEmbed("Show Search", "No results."))
+                else:
+                    return await message.channel.send(embed=makeShowsListEmbed(shows_list))
+
+        elif message.content == f"{PREFIX}show" or message.content.startswith(f"{PREFIX}show "):
+            args = getMessageArgs("show", message)
+            if not args:
+                return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                  f"Usage: ``{PREFIX}show [show id]``"))
+            else:
+                show_id = args[0]
+                if not show_id.isnumeric():
+                    return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                      f"Usage: ``{PREFIX}show [show id]``"))
+                else:
+                    show_id = int(show_id)
+                    if not db.showExists(show_id):
+                        return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                          f"Show ID not found."))
+                    characters = db.getCharactersFromShow(show_id)
+                    show_title_jp = db.getShowTitleJP(show_id)
+                    if not characters:
+                        return await message.channel.send(embed=makeEmbed(f"{show_title_jp}",
+                                                                          f"No waifus found for this show."))
+                    else:
+                        return await message.channel.send(embed=makeShowWaifusEmbed(show_title_jp, characters))
 
     # Drops!
     if db.canDrop(message.guild.id):
@@ -319,6 +366,23 @@ async def showClaimedWaifuDetail(message, user_id, inventory_index):
 
 def getMessageArgs(command, message):
     return message.content.replace(f"{PREFIX}{command}", "").strip().split()
+
+
+def makeShowsListEmbed(shows_list):
+    shows_strings = []
+    for show in shows_list:
+        shows_strings.append(f"""{show["id"]} | **{show["jp_title"]}** ({"Anime" if not show["is_manga"] else "Manga"})""")
+
+    embed = makeEmbed("Show Search", "\n".join(shows_strings))
+    return embed
+
+
+def makeShowWaifusEmbed(show_title_jp, characters):
+    characters_string = []
+    for character in characters:
+        characters_string.append(f"""**{character["en_name"]}** | {character["image_count"]} image(s)""")
+    embed = makeEmbed(f"{show_title_jp}", "\n".join(characters_string))
+    return embed
 
 
 client.run(bot_token.getToken())
