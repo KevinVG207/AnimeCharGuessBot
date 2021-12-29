@@ -248,7 +248,8 @@ async def on_message(message):
                         return False
 
                 try:
-                    guess = await client.wait_for("message", check=isCorrectGuess, timeout=DROP_TIMEOUT)
+                    timeout = DROP_TIMEOUT if not bot_token.isDebug() else 30
+                    guess = await client.wait_for("message", check=isCorrectGuess, timeout=timeout)
                 except asyncio.TimeoutError:
                     db.enableDrops(guild_id)
                     embed = makeEmbed("Timed Out!",
