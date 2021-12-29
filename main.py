@@ -10,7 +10,7 @@ import asyncio
 import database_tools as db
 import name_tools as nt
 
-DROP_CHANCE = 0.1  # Currently 1/25 messages average 0.04
+DROP_CHANCE = 0.1
 EMBED_COLOR = discord.Color.red()
 DROP_TIMEOUT = 5 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
@@ -40,7 +40,8 @@ NAV_EMOJI = {
 async def on_ready():
     db.enableAllDrops()
     print(f"Bot has logged in as {client.user}")
-    print([g.name for g in client.guilds])
+    for g in client.guilds:
+        print(g.name, g.id)
 
 
 @client.event
@@ -269,7 +270,10 @@ def pingToID(ping_string):
 
 
 def calcDropChance(user_count):
-    return min(0.1, (1 / (user_count / 10)))
+    if bot_token.isDebug:
+        return 1
+    else:
+        return min(0.1, (1 / (user_count / 10)))
 
 
 def verifyGuess(guess_name, character_data):
