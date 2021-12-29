@@ -6,3 +6,4 @@ database/
 
 bot_token.py
 discord.log
+run.sh

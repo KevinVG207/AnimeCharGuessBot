@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import collections
 import datetime
 import random
@@ -53,8 +55,9 @@ async def on_message(message):
     TODO: Gacha rolls.
     TODO: Trading.
     TODO: Add lots of characters!
-    TODO: Allow for character lookups in shows.
-    TODO: Add support for manga import.
+    TODO: Pagination for w.show with more than 25 characters.
+    TODO: Character detail page (add ID to w.show) with name(s), image(s) (maybe using pagination),
+          amount claimed, unique users.
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
     """
@@ -380,7 +383,7 @@ def makeShowsListEmbed(shows_list):
 def makeShowWaifusEmbed(show_title_jp, characters):
     characters_string = []
     for character in characters:
-        characters_string.append(f"""**{character["en_name"]}** | {character["image_count"]} image(s)""")
+        characters_string.append(f"""**{character["en_name"]}** | {character["image_count"]} image{"s" if character["image_count"] > 1 else ""}""")
     embed = makeEmbed(f"{show_title_jp}", "\n".join(characters_string))
     return embed
 
