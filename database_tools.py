@@ -140,6 +140,9 @@ def getDropData():
     conn, cursor = getConnection()
     cursor.execute("""SELECT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
+
+    # Doing this for Jack's paranoia.
+    random.seed()
     random.shuffle(rows)
     char_id = rows[0][0]
     cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character

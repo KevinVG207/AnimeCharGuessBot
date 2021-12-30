@@ -6,6 +6,8 @@ import database_tools as db
 
 def getShowURLSegment(show_url):
     no_domain = show_url.split("myanimelist.net/")[1]
+    if "?" in no_domain:
+        no_domain = no_domain.split("?", 1)[0]
     if no_domain.startswith("anime/"):
         is_manga = False
     elif no_domain.startswith("manga/"):
@@ -92,7 +94,7 @@ def downloadCharacterFromURL(character_url):
 
 def downloadCharacter(char_id):
     print(f"Downloading character {char_id}", end=" ")
-    time.sleep(2)
+    time.sleep(3)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")

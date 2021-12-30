@@ -154,6 +154,7 @@ async def on_message(message):
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
             args = getMessageArgs("inspect", message)
             user_id = message.author.id
+            user_name = message.author.display_name
             inventory_index = 0
             # Arguments
             if not args:
@@ -179,11 +180,12 @@ async def on_message(message):
                             # User in current Guild
                             requested_member = await message.guild.fetch_member(user_id)
                             user_id = requested_member.id
+                            user_name = requested_member.display_name
                         except (discord.errors.NotFound, discord.errors.HTTPException):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
-            return await showClaimedWaifuDetail(message, user_id, inventory_index)
+            return await showClaimedWaifuDetail(message, user_id, user_name, inventory_index)
 
         elif message.content == f"{PREFIX}search" or message.content.startswith(f"{PREFIX}search "):
             if not message.content.startswith(f"{PREFIX}search "):
@@ -271,7 +273,7 @@ def pingToID(ping_string):
 
 
 def calcDropChance(user_count):
-    if bot_token.isDebug:
+    if bot_token.isDebug():
         return 1
     else:
         return min(0.1, (1 / (user_count / 10)))
@@ -352,7 +354,7 @@ def clamp(n, minn, maxn):
     return max(min(maxn, n), minn)
 
 
-async def showClaimedWaifuDetail(message, user_id, inventory_index):
+async def showClaimedWaifuDetail(message, user_id, user_name, inventory_index):
     total_waifus = int(db.getWaifuCount(user_id))
     if total_waifus == 0:
         return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""))
@@ -368,6 +370,7 @@ async def showClaimedWaifuDetail(message, user_id, inventory_index):
 
     embed = makeEmbed("Waifu Detail", description)
     embed.set_image(url=waifu_data["image_url"])
+    embed.set_footer(text=f"{user_name}'s Waifu #{inventory_index}")
 
     return await message.channel.send(embed=embed)
 
