@@ -233,7 +233,16 @@ async def on_message(message):
                 # Drop should happen!
                 guild_id = message.guild.id
                 db.disableDrops(guild_id)
-                character_data = db.getDropData()
+                history = db.getHistory(guild_id)
+                if history:
+                    history = history.split(";")
+                character_data = db.getDropData(history=history)
+                if not history:
+                    history = ["-1"]
+                history.append(str(character_data["char_id"]))
+                if len(history) > 100:
+                    history.pop()
+                db.updateHistory(guild_id, history)
                 assigned_channel = client.get_channel(assigned_channel_id)
                 embed = makeEmbed("Waifu Drop!",
                                   f"""A waifu dropped, guess their name!\nHint: ``{nt.generateInitials(character_data)}``""")

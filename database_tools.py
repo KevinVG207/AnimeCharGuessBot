@@ -136,15 +136,23 @@ def canDrop(guild_id):
         return False
 
 
-def getDropData():
+def getDropData(history=None):
     conn, cursor = getConnection()
     cursor.execute("""SELECT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
+    true_rows = []
+
+    if history:
+        for row in rows:
+            if int(row[0]) not in history:
+                true_rows.append(row)
+    else:
+        true_rows = rows
 
     # Doing this for Jack's paranoia.
     random.seed()
-    random.shuffle(rows)
-    char_id = rows[0][0]
+    random.shuffle(true_rows)
+    char_id = true_rows[0][0]
     cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character
     LEFT JOIN images ON character.id = images.character_id
     WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
@@ -395,3 +403,26 @@ ORDER BY s.en_name;""", (show_id,))
                 "image_count": row[2]
             })
         return char_list
+
+
+def getHistory(guild_id):
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT history FROM guild WHERE id = ?""", (guild_id,))
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    if not rows:
+        return None
+    else:
+        return rows[0][0]
+
+
+def updateHistory(guild_id, history):
+    history = ";".join(history)
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE guild SET history = ? WHERE id = ?""", (history, guild_id))
+
+    conn.commit()
+    conn.close()

@@ -1,7 +1,6 @@
 import mal_tools as mal
 import database_tools as db
 
-
 quit()
 
 mal.downloadInsertShowCharacters("")
