@@ -139,34 +139,37 @@ def canDrop(guild_id):
 
 def getDropData(history=None):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT id FROM character WHERE droppable = 1;""")
-    rows = cursor.fetchall()
-    true_rows = []
-
     if history:
-        for row in rows:
-            if int(row[0]) not in history:
-                true_rows.append(row)
+        cursor.execute(f"""SELECT DISTINCT id FROM character WHERE droppable = 1 AND id NOT IN ({",".join(["?" for _ in history])});""", tuple(history))
     else:
-        true_rows = rows
+        cursor.execute("""SELECT DISTINCT id FROM character WHERE droppable = 1;""")
+    rows = cursor.fetchall()
+    # true_rows = []
+
+    # if history:
+    #     for row in rows:
+    #         if int(row[0]) not in history:
+    #             true_rows.append(row)
+    #         else:
+    #             print(row[0])
+    # else:
+    #     true_rows = rows
 
     # Doing this for Jack's paranoia.
     random.seed()
-    random_number = random.randint(0, len(true_rows))
+    random_number = random.randint(0, len(rows))
     # random.shuffle(true_rows)
-    char_id = true_rows[random_number][0]
-    print(char_id)
-    print(type(char_id))
+    char_id = rows[random_number][0]
     cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character
     LEFT JOIN images ON character.id = images.character_id
     WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
-    rows = cursor.fetchall()
+    rows2 = cursor.fetchall()
     conn.close()
-    random.shuffle(rows)
-    image_url = rows[0][0]
-    en_name = rows[0][1]
-    alt_name = rows[0][2]
-    image_id = rows[0][3]
+    random.shuffle(rows2)
+    image_url = rows2[0][0]
+    en_name = rows2[0][1]
+    alt_name = rows2[0][2]
+    image_id = rows2[0][3]
     rarity = generateRarity()
     return {"char_id": char_id,
             "image_url": image_url,
@@ -445,21 +448,9 @@ def updateHistory(guild_id, history):
 
 
 def generateRarity(price=None):
-    random_number = random.uniform(0.0, 1.0)
-
-    if random_number < 0.001:
-        rarity = 5
-    elif random_number < 0.005:
-        rarity = 4
-    elif random_number < 0.015:
-        rarity = 3
-    elif random_number < 0.075:
-        rarity = 2
-    elif random_number < 0.25:
-        rarity = 1
-    else:
-        rarity = 0
-
+    # Thanks Lunarmagpie
+    count, weights = zip(*enumerate((750, 250, 75, 15, 5, 1)))
+    rarity = next(iter(random.choices(count, weights=weights)))
     return rarity
 
 

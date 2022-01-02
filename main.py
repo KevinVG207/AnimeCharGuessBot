@@ -283,7 +283,7 @@ async def on_message(message):
                 embed = makeEmbed("Waifu Claimed!",
                                   f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\nRarity: {character_data["rarity"]}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
-                return await assigned_channel.send(embed=embed)
+                return await guess.reply(embed=embed)
 
     return
 
