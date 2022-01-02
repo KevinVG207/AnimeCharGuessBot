@@ -120,6 +120,7 @@ async def on_message(message):
             user_id = message.author.id
             user_name = message.author.display_name
             cur_page = 0
+            rarity = -1
 
             # Arguments
             if args:
@@ -129,6 +130,13 @@ async def on_message(message):
                         page_arg = args.pop(0)
                         if page_arg.isnumeric():
                             cur_page = int(page_arg) - 1
+                    elif cur_arg.startswith("-r"):
+                        rarity = args.pop(0)
+                        if rarity.isnumeric():
+                            rarity = int(rarity)
+                        else:
+                            return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
+                                                                              "Rarity not a number."))
                     elif not cur_arg.startswith("-") or cur_arg == "-u":
                         if cur_arg.startswith("-"):
                             user_arg = args.pop(0)
@@ -149,7 +157,7 @@ async def on_message(message):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
-            return await showNormalWaifusPage(message, user_id, user_name, cur_page)
+            return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity)
 
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
             args = getMessageArgs("inspect", message)
@@ -266,9 +274,9 @@ async def on_message(message):
                     embed.set_image(url=character_data["image_url"])
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
-                db.saveWin(guess.author.id, character_data["image_id"])
+                db.saveWin(guess.author.id, character_data["image_id"], character_data["rarity"])
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\nRarity: {character_data["rarity"]}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
                 return await assigned_channel.send(embed=embed)
 
@@ -309,8 +317,8 @@ def makeEmbed(title, desciption):
                          timestamp=datetime.datetime.utcnow())
 
 
-async def showNormalWaifusPage(message, user_id, user_name, cur_page):
-    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page)
+async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity):
+    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity)
     if total_pages < 0:
         return await message.channel.send(embed=embed)
     own_message = await message.channel.send(embed=embed)
@@ -332,7 +340,7 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page):
         new_page = cur_page + NAV_EMOJI[reaction.emoji]
         if not new_page < 0 and not new_page + 1 > total_pages:
             cur_page = new_page
-            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page)
+            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity)
             if total_pages < 0:
                 return await message.channel.send(embed=embed)
             await own_message.edit(embed=embed)
@@ -340,21 +348,23 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page):
     return
 
 
-def getWaifuPageEmbed(user_id, user_name, cur_page):
-    waifus, page_data = db.getWaifus(user_id, cur_page, PROFILE_PAGE_SIZE)
-    cur_page = page_data["cur_page"]
+def getWaifuPageEmbed(user_id, user_name, cur_page, rarity):
+    page_data = db.getWaifus(user_id, rarity, PROFILE_PAGE_SIZE)
+    if not page_data:
+        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1
+    if cur_page < 0:
+        cur_page = 0
+    elif cur_page - 1 >= len(page_data):
+        cur_page = len(page_data) - 1
+    page = page_data[cur_page]
     message_strings = []
-    if not waifus:
-        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""), -1
-    waifu_index = cur_page * PROFILE_PAGE_SIZE
-    for waifu in waifus:
-        waifu_index += 1
-        message_strings.append(f"""{waifu_index}: **{waifu["en_name"]}** #{waifu["image_index"]}""")
+    for waifu in page:
+        message_strings.append(f"""{waifu["index"]}: **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}""")
         # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     final_string = "\n".join(message_strings)
     return makeEmbed(
-        f"""{user_name}'s Waifus - Page {page_data["cur_page"] + 1}/{page_data["total_pages"]}""",
-        final_string), page_data["total_pages"], cur_page
+        f"""{user_name}'s Waifus - Page {cur_page + 1}/{len(page_data)}""",
+        final_string), len(page_data), cur_page
 
 
 def clamp(n, minn, maxn):
@@ -373,6 +383,7 @@ async def showClaimedWaifuDetail(message, user_id, user_name, inventory_index):
     description = f"""Character [{waifu_data["id"]}](https://myanimelist.net/character/{waifu_data["id"]})\n**{waifu_data["en_name"]}**\n"""
     if waifu_data["jp_name"]:
         description += f"""{waifu_data["jp_name"]}\n"""
+    description += f"""Rarity: {waifu_data["rarity"]}\n"""
     description += f"""Image #{waifu_data["image_index"]}"""
 
     embed = makeEmbed("Waifu Detail", description)

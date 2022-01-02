@@ -1,5 +1,6 @@
 import random
 import sqlite3
+from enum import Enum
 
 
 DATABASE_URI = "database/database.db"
@@ -166,11 +167,13 @@ def getDropData(history=None):
     en_name = rows[0][1]
     alt_name = rows[0][2]
     image_id = rows[0][3]
+    rarity = generateRarity()
     return {"char_id": char_id,
             "image_url": image_url,
             "en_name": en_name,
             "alt_name": alt_name,
-            "image_id": image_id}
+            "image_id": image_id,
+            "rarity": rarity}
 
 
 def disableDrops(guild_id):
@@ -205,10 +208,10 @@ def ensureUserExists(user_id):
     conn.close()
 
 
-def saveWin(user_id, image_id):
+def saveWin(user_id, image_id, rarity):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""INSERT INTO waifus (user_id, images_id) VALUES (?,?);""", (user_id, image_id))
+    cursor.execute("""INSERT INTO waifus (user_id, images_id, rarity) VALUES (?,?,?);""", (user_id, image_id, rarity))
     conn.commit()
     conn.close()
 
@@ -219,11 +222,11 @@ def divideWaifus(waifus_list, chunk_size):
         yield waifus_list[i:i + chunk_size]
 
 
-def getWaifus(user_id, page_num, page_size):
-    waifus = []
+def getWaifus(user_id, rarity, page_size):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""SELECT en_name, s.image_index
+
+    cursor.execute("""SELECT en_name, s.image_index, rarity
 FROM waifus
 LEFT JOIN (SELECT w.id as id, c.en_name as en_name, w.row_num as image_index
 FROM character c
@@ -234,17 +237,24 @@ WHERE waifus.user_id = ?
 ORDER BY waifus.id;""", (user_id,))
     rows = cursor.fetchall()
     conn.close()
-    pages = list(divideWaifus(rows, page_size))
-    if pages:
-        if page_num < 0:
-            page_num = 0
-        elif page_num - 1 >= len(pages):
-            page_num = len(pages) - 1
-        page = pages[page_num]
-        for row in page:
-            waifus.append({"en_name": row[0],
-                           "image_index": row[1]})
-    return waifus, {"cur_page": page_num, "total_pages": len(pages)}
+    waifus = []
+    final_pages = []
+    index = 0
+
+    for row in rows:
+        index += 1
+        if rarity and rarity >= 0:
+            if row[2] != rarity:
+                continue
+        waifus.append({"en_name": row[0],
+                       "image_index": row[1],
+                       "rarity": row[2],
+                       "index": index})
+
+    if waifus:
+        final_pages = list(divideWaifus(waifus, page_size))
+
+    return final_pages
 
 
 def removeGuild(guild_id):
@@ -286,7 +296,7 @@ WHERE waifus.id = ?;""", (waifu_id,))
 def getWaifuOfUser(user_id, skip):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""SELECT en_name, jp_name, character_id, url, waifus.id
+    cursor.execute("""SELECT en_name, jp_name, character_id, url, waifus.id, rarity
 FROM waifus
 LEFT JOIN images i ON waifus.images_id = i.id
 LEFT JOIN character c ON i.character_id = c.id
@@ -300,7 +310,8 @@ LIMIT ?, 1;""", (user_id, skip))
             "jp_name": rows[0][1],
             "id": rows[0][2],
             "image_url": rows[0][3],
-            "image_index": getWaifuImageIndex(rows[0][4])}
+            "image_index": getWaifuImageIndex(rows[0][4]),
+            "rarity": rows[0][5]}
 
 
 def insertShow(mal_id, jp_title, en_title, is_manga):
@@ -429,3 +440,39 @@ def updateHistory(guild_id, history):
 
     conn.commit()
     conn.close()
+
+
+def generateRarity(price=None):
+    random_number = random.uniform(0.0, 1.0)
+
+    if random_number < 0.001:
+        rarity = 5
+    elif random_number < 0.005:
+        rarity = 4
+    elif random_number < 0.015:
+        rarity = 3
+    elif random_number < 0.075:
+        rarity = 2
+    elif random_number < 0.25:
+        rarity = 1
+    else:
+        rarity = 0
+
+    return rarity
+
+
+def generateRaritiesForUnsetWaifus():
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT id FROM waifus WHERE rarity = -1""")
+    rows = cursor.fetchall()
+    conn.close()
+    if not rows:
+        return
+    conn, cursor = getConnection()
+    for row in rows:
+        waifu_id = row[0]
+        rarity = generateRarity()
+        cursor.execute("""UPDATE waifus SET rarity = ? WHERE id = ?""", (rarity, waifu_id))
+    conn.commit()
+    conn.close()
+    return
