@@ -252,7 +252,7 @@ async def on_message(message):
                     history = []
                 history.append(character_data["char_id"])
                 if len(history) > 100:
-                    history.pop()
+                    history.pop(0)
                 db.updateHistory(guild_id, history)
                 assigned_channel = client.get_channel(assigned_channel_id)
                 embed = makeEmbed("Waifu Drop!",
