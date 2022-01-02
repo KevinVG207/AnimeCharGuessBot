@@ -151,8 +151,11 @@ def getDropData(history=None):
 
     # Doing this for Jack's paranoia.
     random.seed()
-    random.shuffle(true_rows)
-    char_id = true_rows[0][0]
+    random_number = random.randint(0, len(true_rows))
+    # random.shuffle(true_rows)
+    char_id = true_rows[random_number][0]
+    print(char_id)
+    print(type(char_id))
     cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character
     LEFT JOIN images ON character.id = images.character_id
     WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
@@ -413,16 +416,16 @@ def getHistory(guild_id):
 
     conn.close()
 
-    if not rows:
+    if not rows or not rows[0][0]:
         return None
     else:
-        return rows[0][0]
+        return [int(hist_element) for hist_element in rows[0][0].split(";")]
 
 
 def updateHistory(guild_id, history):
-    history = ";".join(history)
+    history_joined = ";".join([str(hist_element) for hist_element in history])
     conn, cursor = getConnection()
-    cursor.execute("""UPDATE guild SET history = ? WHERE id = ?""", (history, guild_id))
+    cursor.execute("""UPDATE guild SET history = ? WHERE id = ?""", (history_joined, guild_id))
 
     conn.commit()
     conn.close()

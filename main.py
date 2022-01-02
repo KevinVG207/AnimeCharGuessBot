@@ -234,12 +234,10 @@ async def on_message(message):
                 guild_id = message.guild.id
                 db.disableDrops(guild_id)
                 history = db.getHistory(guild_id)
-                if history:
-                    history = history.split(";")
                 character_data = db.getDropData(history=history)
                 if not history:
-                    history = ["-1"]
-                history.append(str(character_data["char_id"]))
+                    history = []
+                history.append(character_data["char_id"])
                 if len(history) > 100:
                     history.pop()
                 db.updateHistory(guild_id, history)

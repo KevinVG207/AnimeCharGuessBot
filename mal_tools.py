@@ -35,7 +35,12 @@ def downloadInsertShowCharacters(show_url, overwrite=False):
         return -1
     print(show_url_segment)
     time.sleep(1)
-    page = requests.get(f"{show_url}/characters")
+    if is_manga:
+        request_url = f"https://myanimelist.net/manga/{show_url_segment}"
+    else:
+        request_url = f"https://myanimelist.net/anime/{show_url_segment}"
+
+    page = requests.get(f"{request_url}/characters")
     soup = BeautifulSoup(page.content, "html.parser")
 
     if not is_manga:
@@ -94,7 +99,7 @@ def downloadCharacterFromURL(character_url):
 
 def downloadCharacter(char_id):
     print(f"Downloading character {char_id}", end=" ")
-    time.sleep(3)
+    time.sleep(1)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")
