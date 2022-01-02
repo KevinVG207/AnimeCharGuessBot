@@ -121,6 +121,7 @@ async def on_message(message):
             user_name = message.author.display_name
             cur_page = 0
             rarity = -1
+            name_query = None
 
             # Arguments
             if args:
@@ -137,6 +138,10 @@ async def on_message(message):
                         else:
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Rarity not a number."))
+                    elif cur_arg.startswith("-n"):
+                        name_args = args
+                        args = []
+                        name_query = " ".join(name_args)
                     elif not cur_arg.startswith("-") or cur_arg == "-u":
                         if cur_arg.startswith("-"):
                             user_arg = args.pop(0)
@@ -157,7 +162,7 @@ async def on_message(message):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
-            return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity)
+            return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query)
 
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
             args = getMessageArgs("inspect", message)
@@ -317,8 +322,8 @@ def makeEmbed(title, desciption):
                          timestamp=datetime.datetime.utcnow())
 
 
-async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity):
-    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity)
+async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query):
+    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query)
     if total_pages < 0:
         return await message.channel.send(embed=embed)
     own_message = await message.channel.send(embed=embed)
@@ -340,7 +345,7 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity):
         new_page = cur_page + NAV_EMOJI[reaction.emoji]
         if not new_page < 0 and not new_page + 1 > total_pages:
             cur_page = new_page
-            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity)
+            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query)
             if total_pages < 0:
                 return await message.channel.send(embed=embed)
             await own_message.edit(embed=embed)
@@ -348,10 +353,10 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity):
     return
 
 
-def getWaifuPageEmbed(user_id, user_name, cur_page, rarity):
-    page_data = db.getWaifus(user_id, rarity, PROFILE_PAGE_SIZE)
+def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
+    page_data = db.getWaifus(user_id, rarity, name_query, PROFILE_PAGE_SIZE)
     if not page_data:
-        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1
+        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1, -1
     if cur_page < 0:
         cur_page = 0
     elif cur_page - 1 >= len(page_data):

@@ -1,6 +1,6 @@
 import random
 import sqlite3
-from enum import Enum
+import name_tools as nt
 
 
 DATABASE_URI = "database/database.db"
@@ -222,7 +222,7 @@ def divideWaifus(waifus_list, chunk_size):
         yield waifus_list[i:i + chunk_size]
 
 
-def getWaifus(user_id, rarity, page_size):
+def getWaifus(user_id, rarity, name_query, page_size):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
 
@@ -246,6 +246,8 @@ ORDER BY waifus.id;""", (user_id,))
         if rarity and rarity >= 0:
             if row[2] != rarity:
                 continue
+        if name_query and nt.romanizationFix(name_query.lower()) not in nt.romanizationFix(row[0].lower()):
+            continue
         waifus.append({"en_name": row[0],
                        "image_index": row[1],
                        "rarity": row[2],
