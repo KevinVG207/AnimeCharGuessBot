@@ -92,7 +92,7 @@ async def on_message(message):
             specific_command = args[0]
             if specific_command == "waifus":
                 embed_title = f"Help for {PREFIX}waifus"
-                embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -p [page number]``"
+                embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -r [rarity number] -p [page number]``"
             elif specific_command == "inspect":
                 embed_title = f"Help for {PREFIX}inspect"
                 embed_description = f"Inspect a waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
