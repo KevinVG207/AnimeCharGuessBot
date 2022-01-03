@@ -65,6 +65,9 @@ async def on_message(message):
     if message.author == client.user:
         return
 
+    # I wonder if this causes issues elsewhere. The whole bot becomes case insensitive.
+    message.content = message.content.lower()
+
     if message.content == f"{PREFIX}ping":
         return await message.channel.send("Pong! :ping_pong:")
 
