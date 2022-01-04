@@ -137,6 +137,17 @@ def canDrop(guild_id):
         return False
 
 
+def canTrade(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT can_trade FROM user WHERE id = ? AND can_trade = 1;""", (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if rows:
+        return True
+    else:
+        return False
+
+
 def getDropData(history=None):
     conn, cursor = getConnection()
     if history:
@@ -193,9 +204,30 @@ def enableDrops(guild_id):
     conn.close()
 
 
+def enableTrade(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_trade = 1 WHERE id = ?;""", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def disableTrade(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_trade = 0 WHERE id = ?;""", (user_id,))
+    conn.commit()
+    conn.close()
+
+
 def enableAllDrops():
     conn, cursor = getConnection()
     cursor.execute("""UPDATE guild SET can_drop = 1;""")
+    conn.commit()
+    conn.close()
+
+
+def enableAllTrades():
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_trade = 1;""")
     conn.commit()
     conn.close()
 
@@ -211,12 +243,17 @@ def ensureUserExists(user_id):
     conn.close()
 
 
-def saveWin(user_id, image_id, rarity):
+def addWaifu(user_id, image_id, rarity, connection=None):
     ensureUserExists(user_id)
-    conn, cursor = getConnection()
+    if not connection:
+        conn, cursor = getConnection()
+    else:
+        conn, cursor = connection
     cursor.execute("""INSERT INTO waifus (user_id, images_id, rarity) VALUES (?,?,?);""", (user_id, image_id, rarity))
-    conn.commit()
-    conn.close()
+
+    if not connection:
+        conn.commit()
+        conn.close()
 
 
 def divideWaifus(waifus_list, chunk_size):
@@ -225,13 +262,13 @@ def divideWaifus(waifus_list, chunk_size):
         yield waifus_list[i:i + chunk_size]
 
 
-def getWaifus(user_id, rarity, name_query, page_size):
+def getWaifus(user_id, rarity=None, name_query=None, page_size=25, unpaginated=False):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
 
-    cursor.execute("""SELECT en_name, s.image_index, rarity
+    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id
 FROM waifus
-LEFT JOIN (SELECT w.id as id, c.en_name as en_name, w.row_num as image_index
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index
 FROM character c
 LEFT JOIN (SELECT id, character_id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
 ON w.character_id = c.id) s
@@ -254,10 +291,16 @@ ORDER BY waifus.id;""", (user_id,))
         waifus.append({"en_name": row[0],
                        "image_index": row[1],
                        "rarity": row[2],
+                       "char_id": row[3],
+                       "images_id": row[4],
+                       "waifus_id": row[5],
                        "index": index})
 
     if waifus:
-        final_pages = list(divideWaifus(waifus, page_size))
+        if unpaginated:
+            final_pages = waifus
+        else:
+            final_pages = list(divideWaifus(waifus, page_size))
 
     return final_pages
 
@@ -469,3 +512,32 @@ def generateRaritiesForUnsetWaifus():
     conn.commit()
     conn.close()
     return
+
+
+def trade(user1_id, user2_id, user1_offer, user2_offer):
+    conn, cursor = getConnection()
+
+    # Start by deleting existing waifus, ensuring they exist. Then insert waifu for other user.
+    for waifu in user1_offer:
+        cursor.execute("""SELECT id FROM waifus WHERE id = ? AND user_id = ?""", (waifu["waifus_id"], user1_id))
+        rows = cursor.fetchall()
+        if not rows:
+            conn.close()
+            return False
+        else:
+            cursor.execute("""DELETE FROM waifus WHERE id = ?""", (waifu["waifus_id"],))
+            addWaifu(user2_id, waifu["images_id"], waifu["rarity"], connection=(conn, cursor))
+
+    for waifu in user2_offer:
+        cursor.execute("""SELECT id FROM waifus WHERE id = ? AND user_id = ?""", (waifu["waifus_id"], user2_id))
+        rows = cursor.fetchall()
+        if not rows:
+            conn.close()
+            return False
+        else:
+            cursor.execute("""DELETE FROM waifus WHERE id = ?""", (waifu["waifus_id"],))
+            addWaifu(user1_id, waifu["images_id"], waifu["rarity"], connection=(conn, cursor))
+
+    conn.commit()
+    conn.close()
+    return True

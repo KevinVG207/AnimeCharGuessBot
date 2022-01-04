@@ -16,6 +16,7 @@ DROP_TIMEOUT = 5 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
+TRADE_TIMEOUT = 60
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.WARNING)
@@ -39,6 +40,7 @@ NAV_EMOJI = {
 @client.event
 async def on_ready():
     db.enableAllDrops()
+    db.enableAllTrades()
     print(f"Bot has logged in as {client.user}")
     for g in client.guilds:
         print(g.name, g.id)
@@ -82,7 +84,8 @@ async def on_message(message):
                 "waifus": "View your collected waifus.",
                 "search": "Find a show.",
                 "show": "View characters of a show.",
-                "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)"
+                "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
+                "trade": "Start a trade offer with another user."
             }
             help_lines = []
             for command, text in help_commands.items():
@@ -105,6 +108,9 @@ async def on_message(message):
             elif specific_command == "show":
                 embed_title = f"Help for {PREFIX}show"
                 embed_description = f"Displays the characters of a show that the bot has.\nUsage: ``{PREFIX}show [show id]``"
+            elif specific_command == "trade":
+                embed_title = f"Help for {PREFIX}trade"
+                embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -175,7 +181,7 @@ async def on_message(message):
             # Arguments
             if not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                  f"Usage: ``{PREFIX}inspect [number] (optional: -u @ping/user_id)``"))
+                                                                  f"Usage: ``{PREFIX}inspect [number] (optional: -u @ping/user_id)``"))
             else:
                 inventory_arg = args.pop(0)
                 if not inventory_arg.isnumeric():
@@ -186,21 +192,16 @@ async def on_message(message):
                     cur_arg = args.pop(0)
                     if cur_arg == "-u":
                         user_arg = args.pop(0)
-                        if user_arg.startswith("<@!"):
-                            # It's a ping
-                            user_id = pingToID(user_arg)
-                        else:
-                            # Assume it's an ID
-                            user_id = user_arg
-                        try:
-                            # User in current Guild
-                            requested_member = await message.guild.fetch_member(user_id)
-                            user_id = requested_member.id
-                            user_name = requested_member.display_name
-                        except (discord.errors.NotFound, discord.errors.HTTPException):
+
+                        requested_member = await getUserInGuild(user_arg, message.guild)
+
+                        if not requested_member:
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
+                        user_id = requested_member.id
+                        user_name = requested_member.display_name
+
             return await showClaimedWaifuDetail(message, user_id, user_name, inventory_index)
 
         elif message.content == f"{PREFIX}search" or message.content.startswith(f"{PREFIX}search "):
@@ -241,6 +242,144 @@ async def on_message(message):
                     else:
                         return await message.channel.send(embed=makeShowWaifusEmbed(show_title_jp, characters))
 
+        elif message.content == f"{PREFIX}trade" or message.content.startswith(f"{PREFIX}trade "):
+            if db.canTrade(message.author.id):
+                if not message.content.startswith(f"{PREFIX}trade "):
+                    return await message.channel.send(
+                        embed=makeEmbed("Command failed.", f"Usage: ``{PREFIX}trade [user]``"))
+                user1 = message.author
+                user1_confirm = False
+                user1_offer = []
+                user2 = await getUserInGuild(message.content.split(" ", 1)[1], message.guild)
+
+                if not user2:
+                    return await message.channel.send(
+                        embed=makeEmbed("Failed to start trade.", "User not found in server."))
+
+                user2_confirm = False
+                user2_offer = []
+                cancel = False
+                timeout = False
+
+                db.disableTrade(user1.id)
+                db.disableTrade(user2.id)
+
+                def receiveTradeMessage(m):
+                    if m.channel.id == message.channel.id:
+                        if m.author.id == user1.id or m.author.id == user2.id:
+                            return True
+                    return False
+
+                change = False
+                user1_prev_confirm = -1
+                user2_prev_confirm = -1
+
+                while not cancel and not timeout:
+                    # Determine what to do
+                    if user1_prev_confirm != user1_confirm or \
+                            user2_prev_confirm != user2_confirm or \
+                            change:
+                        # State changed!
+                        if user1_confirm and user2_confirm:
+                            # Both confirmed
+                            break
+                        else:
+                            # Normal state change
+                            await message.channel.send(
+                                embed=makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_confirm))
+                    else:
+                        # No state change
+                        pass
+
+                    if cancel:
+                        break
+
+                    user1_prev_confirm = user1_confirm
+                    user2_prev_confirm = user2_confirm
+                    change = False
+
+                    # Wait for next message
+                    try:
+                        m = await client.wait_for("message", check=receiveTradeMessage,
+                                                  timeout=TRADE_TIMEOUT if not bot_token.isDebug() else 30)
+                        m.content = m.content.lower()
+                        if m.content == f"{PREFIX}trade cancel":
+                            cancel = True
+                        elif m.content == f"{PREFIX}trade confirm":
+                            if m.author.id == user1.id:
+                                user1_confirm = True
+                            else:
+                                user2_confirm = True
+                        elif m.content.startswith(f"{PREFIX}trade add"):
+                            if not m.content.startswith(f"{PREFIX}trade add "):
+                                await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                                                     f"Usage: ``{PREFIX}trade add [inventory number]``"))
+                            else:
+                                to_be_added = m.content.split(" ", 2)[2]
+                                if not to_be_added.isnumeric():
+                                    await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                                                         f"Usage: ``{PREFIX}trade add [inventory number]``"))
+                                else:
+                                    to_be_added = int(to_be_added)
+                                    current_waifus = db.getWaifus(m.author.id, unpaginated=True)
+                                    if to_be_added > len(current_waifus):
+                                        await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                                                             f"Waifu not found in user's inventory."))
+                                    else:
+                                        if m.author.id == user1.id:
+                                            user1_offer.append(current_waifus[to_be_added-1])
+                                            change = True
+                                        else:
+                                            user2_offer.append(current_waifus[to_be_added-1])
+                                            change = True
+                        elif m.content.startswith(f"{PREFIX}trade remove"):
+                            if not m.content.startswith(f"{PREFIX}trade remove "):
+                                await m.channel.send(embed=makeEmbed("Trade remove failed.",
+                                                                     f"Usage: ``{PREFIX}trade remove [inventory number]``"))
+                            else:
+                                to_be_removed = m.content.split(" ", 2)[2]
+                                if not to_be_removed.isnumeric():
+                                    await m.channel.send(embed=makeEmbed("Trade remove failed.",
+                                                                         f"Usage: ``{PREFIX}trade remove [inventory number]``"))
+                                else:
+                                    to_be_removed = int(to_be_removed)
+                                    removed = False
+                                    new_offer = []
+                                    if m.author.id == user1.id:
+                                        for waifu in user1_offer:
+                                            if waifu["index"] == to_be_removed:
+                                                removed = True
+                                            else:
+                                                new_offer.append(waifu)
+                                        user1_offer = new_offer
+                                    else:
+                                        for waifu in user2_offer:
+                                            if waifu["index"] == to_be_removed:
+                                                removed = True
+                                            else:
+                                                new_offer.append(waifu)
+                                        user2_offer = new_offer
+                                    if not removed:
+                                        await m.channel.send(embed=makeEmbed("Trade remove failed.", "Waifu not found in trade offer."))
+                                    else:
+                                        change = True
+                    except asyncio.TimeoutError:
+                        timeout = True
+                        break
+
+                db.enableTrade(user1.id)
+                db.enableTrade(user2.id)
+
+                if cancel:
+                    return await message.channel.send(embed=makeEmbed("Trade Cancelled", "Trade has been cancelled."))
+                elif timeout:
+                    return await message.channel.send(embed=makeEmbed("Trade Cancelled", "Trade has timed out."))
+                else:
+                    if not db.trade(user1.id, user2.id, user1_offer, user2_offer):
+                        return await message.channel.send(embed=makeEmbed("Trade Failed",
+                                                                          "Something went wrong. The trade has been cancelled."))
+                    return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
+
     # Drops!
     if db.canDrop(message.guild.id):
         if random.random() < calcDropChance(message.guild.member_count):
@@ -265,7 +404,7 @@ async def on_message(message):
 
                 def isCorrectGuess(m):
                     if m.channel.id == assigned_channel_id:
-                        if verifyGuess(m.content, character_data):
+                        if verifyGuess(m.content.lower(), character_data):
                             return True
                         else:
                             return False
@@ -282,7 +421,7 @@ async def on_message(message):
                     embed.set_image(url=character_data["image_url"])
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
-                db.saveWin(guess.author.id, character_data["image_id"], character_data["rarity"])
+                db.addWaifu(guess.author.id, character_data["image_id"], character_data["rarity"])
                 embed = makeEmbed("Waifu Claimed!",
                                   f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\nRarity: {character_data["rarity"]}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
@@ -359,7 +498,8 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, na
 def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
     page_data = db.getWaifus(user_id, rarity, name_query, PROFILE_PAGE_SIZE)
     if not page_data:
-        return makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1, -1
+        return makeEmbed("404 Waifu Not Found",
+                         f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1, -1
     if cur_page < 0:
         cur_page = 0
     elif cur_page - 1 >= len(page_data):
@@ -367,7 +507,8 @@ def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
     page = page_data[cur_page]
     message_strings = []
     for waifu in page:
-        message_strings.append(f"""{waifu["index"]}: **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}""")
+        message_strings.append(
+            f"""{waifu["index"]}: **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}""")
         # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     final_string = "\n".join(message_strings)
     return makeEmbed(
@@ -382,7 +523,8 @@ def clamp(n, minn, maxn):
 async def showClaimedWaifuDetail(message, user_id, user_name, inventory_index):
     total_waifus = int(db.getWaifuCount(user_id))
     if total_waifus == 0:
-        return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""))
+        return await message.channel.send(embed=makeEmbed("404 Waifu Not Found",
+                                                          f"""Selected user does not have any waifus yet...\nThey'd better claim some!"""))
     skip = clamp(inventory_index, 1, total_waifus) - 1
     waifu_data = db.getWaifuOfUser(user_id, skip)
     if not waifu_data:
@@ -408,7 +550,8 @@ def getMessageArgs(command, message):
 def makeShowsListEmbed(shows_list):
     shows_strings = []
     for show in shows_list:
-        shows_strings.append(f"""{show["id"]} | **{show["jp_title"]}** ({"Anime" if not show["is_manga"] else "Manga"})""")
+        shows_strings.append(
+            f"""{show["id"]} | **{show["jp_title"]}** ({"Anime" if not show["is_manga"] else "Manga"})""")
 
     embed = makeEmbed("Show Search", "\n".join(shows_strings))
     return embed
@@ -417,8 +560,57 @@ def makeShowsListEmbed(shows_list):
 def makeShowWaifusEmbed(show_title_jp, characters):
     characters_string = []
     for character in characters:
-        characters_string.append(f"""**{character["en_name"]}** | {character["image_count"]} image{"s" if character["image_count"] > 1 else ""}""")
+        characters_string.append(
+            f"""**{character["en_name"]}** | {character["image_count"]} image{"s" if character["image_count"] > 1 else ""}""")
     embed = makeEmbed(f"{show_title_jp}", "\n".join(characters_string))
+    return embed
+
+
+async def getUserInGuild(requested_user, guild):
+    """
+    Gets user object from ping or user ID.
+    Returns None if user not found in guild.
+    :param requested_user: string - User ping or ID
+    :param guild: Guild Object - The guild to search the user in.
+    :return: User Object
+    """
+    if requested_user.startswith("<@!"):
+        # It's a ping
+        user_id = pingToID(requested_user)
+    else:
+        # Assume it's an ID
+        user_id = requested_user
+    try:
+        # User in current Guild
+        member_in_guild = await guild.fetch_member(user_id)
+        return member_in_guild
+    except (discord.errors.NotFound, discord.errors.HTTPException):
+        # User not in current Guild
+        return None
+
+
+def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_confirm):
+    description = ""
+
+    description += f"**{user1.display_name}**'s offer:\n"
+    if not user1_offer:
+        description += "``Empty``\n"
+    else:
+        for waifu in user1_offer:
+            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}\n"""
+    description += f"""{":white_check_mark: Confirmed" if user1_confirm else ":x: Unconfirmed"}\n"""
+
+    description += f"\n**{user2.display_name}**'s offer:\n"
+    if not user2_offer:
+        description += "``Empty``\n"
+    else:
+        for waifu in user2_offer:
+            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}\n"""
+    description += f"""{":white_check_mark: Confirmed" if user2_confirm else ":x: Unconfirmed"}\n"""
+
+    description += f"""\nAdd waifus using ``{PREFIX}trade add [inventory number]``\nConfirm trade using ``{PREFIX}trade confirm``"""
+
+    embed = makeEmbed("Waifu Trade Offer", description)
     return embed
 
 
