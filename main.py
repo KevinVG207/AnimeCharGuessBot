@@ -17,6 +17,7 @@ PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
 TRADE_TIMEOUT = 60
+HISTORY_SIZE = 500
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.WARNING)
@@ -413,7 +414,7 @@ async def on_message(message):
                 if not history:
                     history = []
                 history.append(character_data["char_id"])
-                if len(history) > 100:
+                while len(history) > HISTORY_SIZE:
                     history.pop(0)
                 db.updateHistory(guild_id, history)
                 assigned_channel = client.get_channel(assigned_channel_id)
