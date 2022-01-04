@@ -252,7 +252,7 @@ async def on_message(message):
                 user1_offer = []
                 user2 = await getUserInGuild(message.content.split(" ", 1)[1], message.guild)
 
-                if not user2:
+                if not user2 or user1.id == user2.id:
                     return await message.channel.send(
                         embed=makeEmbed("Failed to start trade.", "User not found in server."))
 
@@ -327,11 +327,26 @@ async def on_message(message):
                                                                              f"Waifu not found in user's inventory."))
                                     else:
                                         if m.author.id == user1.id:
-                                            user1_offer.append(current_waifus[to_be_added-1])
-                                            change = True
+                                            new_waifu = current_waifus[to_be_added - 1]
+                                            dupe = False
+                                            for waifu in user1_offer:
+                                                if waifu["waifus_id"] == new_waifu["waifus_id"]:
+                                                    dupe = True
+                                                    await m.channel.send(embed=makeEmbed("Trade add failed.", "Selected waifu already in offer."))
+                                            if not dupe:
+                                                user1_offer.append(new_waifu)
+                                                change = True
                                         else:
-                                            user2_offer.append(current_waifus[to_be_added-1])
-                                            change = True
+                                            new_waifu = current_waifus[to_be_added - 1]
+                                            dupe = False
+                                            for waifu in user2_offer:
+                                                if waifu["waifus_id"] == new_waifu["waifus_id"]:
+                                                    dupe = True
+                                                    await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                                                                         "Selected waifu already in offer."))
+                                            if not dupe:
+                                                user2_offer.append(new_waifu)
+                                                change = True
                         elif m.content.startswith(f"{PREFIX}trade remove"):
                             if not m.content.startswith(f"{PREFIX}trade remove "):
                                 await m.channel.send(embed=makeEmbed("Trade remove failed.",
