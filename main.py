@@ -82,7 +82,7 @@ async def on_message(message):
                 "help": f"Show this help message. Use {PREFIX}help [command] to get help for a specific command.",
                 "ping": "Pong.",
                 "waifus": "View your collected waifus.",
-                "list": "Alias of {PREFIX}waifus.",
+                "list": f"Alias of {PREFIX}waifus.",
                 "search": "Find a show.",
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
@@ -401,7 +401,7 @@ async def on_message(message):
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
 
     # Drops!
-    if db.canDrop(message.guild.id):
+    if not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
         if random.random() < calcDropChance(message.guild.member_count):
             assigned_channel_id = db.getAssignedChannelID(message.guild.id)
             if assigned_channel_id:
