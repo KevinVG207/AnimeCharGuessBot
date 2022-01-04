@@ -82,6 +82,7 @@ async def on_message(message):
                 "help": f"Show this help message. Use {PREFIX}help [command] to get help for a specific command.",
                 "ping": "Pong.",
                 "waifus": "View your collected waifus.",
+                "list": "Alias of {PREFIX}waifus.",
                 "search": "Find a show.",
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
@@ -96,7 +97,7 @@ async def on_message(message):
             embed_title = "No extra help available."
             embed_description = "This command has no additional help available."
             specific_command = args[0]
-            if specific_command == "waifus":
+            if specific_command == "waifus" or specific_command == "list":
                 embed_title = f"Help for {PREFIX}waifus"
                 embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -r [rarity number] -p [page number] -n [part of name (MUST BE FINAL ARGUMENT cuz I'm lazy)]``"
             elif specific_command == "inspect":
@@ -123,8 +124,12 @@ async def on_message(message):
 
     # These should only happen in the assigned channel
     if message.channel.id == db.getAssignedChannelID(message.guild.id):
-        if message.content == f"{PREFIX}waifus" or message.content.startswith(f"{PREFIX}waifus "):
-            args = getMessageArgs("waifus", message)
+        if message.content == f"{PREFIX}waifus" or message.content.startswith(f"{PREFIX}waifus ") or \
+                message.content == f"{PREFIX}list" or message.content.startswith(f"{PREFIX}list "):
+            if message.content.startswith(f"{PREFIX}waifus"):
+                args = getMessageArgs("waifus", message)
+            else:
+                args = getMessageArgs("list", message)
 
             user_id = message.author.id
             user_name = message.author.display_name
