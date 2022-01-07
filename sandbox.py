@@ -1,25 +1,13 @@
 import mal_tools as mal
 import database_tools as db
 
-
-mal.downloadInsertShowCharacters("https://myanimelist.net/manga/91941/Made_in_Abyss?q=made%20in%20abyss&cat=manga")
-# mal.downloadInsertShowCharacters("https://myanimelist.net/anime/5114/Fullmetal_Alchemist__Brotherhood?q=full%20metal%20alchemist&cat=anime")
-# mal.downloadInsertShowCharacters("https://myanimelist.net/anime/205/Samurai_Champloo?q=samurai%20cham&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/18679/Kill_la_Kill?q=kill&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/manga/108495/NieR_Automata?q=nier&cat=manga")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/5081/Bakemonogatari?q=bakemonogatari&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/11597/Nisemonogatari?q=nisemonog&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/15689/Nekomonogatari__Kuro?q=monogatari&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/17074/Monogatari_Series__Second_Season?q=monog&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/28025/Tsukimonogatari?q=tsuki&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/21855/Hanamonogatari?q=hana&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/31181/Owarimonogatari?q=owari&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/35247/Owarimonogatari_2nd_Season?q=owari&cat=anime")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/36999/Zoku_Owarimonogatari?q=zoku%20owari&cat=anime")
+for show in db.getCharactersFromShow(59):
+    print(show)
 quit()
 
 mal.downloadInsertShowCharacters("")
 
+mal.downloadInsertShowCharacters("https://myanimelist.net/manga/7519/Kami_nomi_zo_Shiru_Sekai/")
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/123450/Saikin_Yatotta_Maid_ga_Ayashii")
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/138079/Genshin_Comic_Anthology")
 

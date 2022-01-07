@@ -9,6 +9,7 @@ import bot_token
 import asyncio
 import database_tools as db
 import name_tools as nt
+from numpy import random as numpyrand
 
 DROP_CHANCE = 0.1
 EMBED_COLOR = discord.Color.red()
@@ -57,7 +58,7 @@ async def on_message(message):
     """
     TODO: Rarities.
     TODO: Gacha rolls.
-    TODO: Trading.
+    TODO: Add -s [show_id] to w.waifus
     TODO: Add lots of characters!
     TODO: Pagination for w.show with more than 25 characters.
     TODO: Character detail page (add ID to w.show) with name(s), image(s) (maybe using pagination),
@@ -87,11 +88,13 @@ async def on_message(message):
                 "search": "Find a show.",
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
-                "trade": "Start a trade offer with another user."
+                "trade": "Start a trade offer with another user.",
+                "inspect": "View one of your collected waifus in more detail."
             }
+            commands_sorted = sorted(help_commands.keys())
             help_lines = []
-            for command, text in help_commands.items():
-                help_lines.append(f"**{command}**: {text}")
+            for command in commands_sorted:
+                help_lines.append(f"**{command}**: {help_commands[command]}")
             return await message.channel.send(embed=makeEmbed("Bot Help", "\n".join(help_lines)))
         else:
             # Help for specific command.
@@ -103,7 +106,7 @@ async def on_message(message):
                 embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -r [rarity number] -p [page number] -n [part of name (MUST BE FINAL ARGUMENT cuz I'm lazy)]``"
             elif specific_command == "inspect":
                 embed_title = f"Help for {PREFIX}inspect"
-                embed_description = f"Inspect a waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
+                embed_description = f"Inspect a collected waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
             elif specific_command == "search":
                 embed_title = f"Help for {PREFIX}search"
                 embed_description = f"Look for shows that the bot has characters of.\nUsage: ``{PREFIX}search [anime/manga name]``"
@@ -403,7 +406,7 @@ async def on_message(message):
 
     # Drops!
     if not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
-        if random.random() < calcDropChance(message.guild.member_count):
+        if numpyrand.random() < calcDropChance(message.guild.member_count):
             assigned_channel_id = db.getAssignedChannelID(message.guild.id)
             if assigned_channel_id:
                 # Drop should happen!
@@ -444,7 +447,7 @@ async def on_message(message):
                 db.enableDrops(guild_id)
                 db.addWaifu(guess.author.id, character_data["image_id"], character_data["rarity"])
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\nRarity: {character_data["rarity"]}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                 embed.set_image(url=character_data["image_url"])
                 return await guess.reply(embed=embed)
 
@@ -529,7 +532,7 @@ def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
     message_strings = []
     for waifu in page:
         message_strings.append(
-            f"""{waifu["index"]}: **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}""")
+            f"""``{waifu["index"]}`` {makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}""")
         # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     final_string = "\n".join(message_strings)
     return makeEmbed(
@@ -551,13 +554,14 @@ async def showClaimedWaifuDetail(message, user_id, user_name, inventory_index):
     if not waifu_data:
         return await message.channel.send(embed=makeEmbed("404 Waifu Not Found",
                                                           f"""Something went wrong with retrieving the requested waifu."""))
-    description = f"""Character [{waifu_data["id"]}](https://myanimelist.net/character/{waifu_data["id"]})\n**{waifu_data["en_name"]}**\n"""
+    description = ""
     if waifu_data["jp_name"]:
         description += f"""{waifu_data["jp_name"]}\n"""
-    description += f"""Rarity: {waifu_data["rarity"]}\n"""
-    description += f"""Image #{waifu_data["image_index"]}"""
+    description += f"""{makeRarityString(waifu_data["rarity"])}\n"""
+    description += f"""Image #{waifu_data["image_index"]}\n"""
+    description += f"""MAL ID: [{waifu_data["id"]}](https://myanimelist.net/character/{waifu_data["id"]})"""
 
-    embed = makeEmbed("Waifu Detail", description)
+    embed = makeEmbed(f"""{waifu_data["en_name"]}""", description)
     embed.set_image(url=waifu_data["image_url"])
     embed.set_footer(text=f"{user_name}'s Waifu #{inventory_index}")
 
@@ -618,7 +622,7 @@ def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_
         description += "``Empty``\n"
     else:
         for waifu in user1_offer:
-            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}\n"""
+            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{makeRarityString(waifu["rarity"])} #{waifu["image_index"]}\n"""
     description += f"""{":white_check_mark: Confirmed" if user1_confirm else ":x: Unconfirmed"}\n"""
 
     description += f"\n**{user2.display_name}**'s offer:\n"
@@ -626,13 +630,21 @@ def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_
         description += "``Empty``\n"
     else:
         for waifu in user2_offer:
-            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{waifu["rarity"]} #{waifu["image_index"]}\n"""
+            description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{makeRarityString(waifu["rarity"])} #{waifu["image_index"]}\n"""
     description += f"""{":white_check_mark: Confirmed" if user2_confirm else ":x: Unconfirmed"}\n"""
 
     description += f"""\nAdd waifus using ``{PREFIX}trade add [inventory number]``\nConfirm trade using ``{PREFIX}trade confirm``"""
 
     embed = makeEmbed("Waifu Trade Offer", description)
     return embed
+
+
+def makeRarityString(rarity):
+    max_rarity = 5
+    rarity = int(rarity)
+    out = "★" * rarity
+    out += "☆" * (max_rarity - rarity)
+    return out
 
 
 client.run(bot_token.getToken())

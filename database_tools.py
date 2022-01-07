@@ -1,6 +1,7 @@
 import random
 import sqlite3
 import name_tools as nt
+from numpy import random as numpyrand
 
 
 DATABASE_URI = "database/database.db"
@@ -167,9 +168,10 @@ def getDropData(history=None):
     #     true_rows = rows
 
     # Doing this for Jack's paranoia.
-    random.seed()
-    random_number = random.randint(0, len(rows))
+    # random.seed()
+    # random_number = random.randint(0, len(rows))
     # random.shuffle(true_rows)
+    random_number = numpyrand.randint(0, len(rows))
     char_id = rows[random_number][0]
     cursor.execute("""SELECT url, en_name, alt_name, images.id FROM character
     LEFT JOIN images ON character.id = images.character_id
@@ -541,3 +543,18 @@ def trade(user1_id, user2_id, user1_offer, user2_offer):
     conn.commit()
     conn.close()
     return True
+
+
+def removeUselessWaifus():
+    conn, cursor = getConnection()
+
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%father%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%grandfather%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%grandpa%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%mother%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%grandmother%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%grandma%'""")
+    cursor.execute("""UPDATE character SET droppable = 0 WHERE en_name LIKE '%teacher%'""")
+
+    conn.commit()
+    conn.close()
