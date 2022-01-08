@@ -648,7 +648,7 @@ def makeRarityString(rarity):
         out += "★" * rarity
         out += "☆" * (max_rarity - rarity)
     else:
-        out = "U L T R A"
+        out = "✪✪✪✪✪"
 
     return out
 
