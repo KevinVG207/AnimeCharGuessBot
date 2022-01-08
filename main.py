@@ -640,10 +640,16 @@ def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_
 
 
 def makeRarityString(rarity):
-    max_rarity = 5
     rarity = int(rarity)
-    out = "★" * rarity
-    out += "☆" * (max_rarity - rarity)
+
+    if rarity < 5:
+        max_rarity = 4
+        out = "★"
+        out += "★" * rarity
+        out += "☆" * (max_rarity - rarity)
+    else:
+        out = "U L T R A"
+
     return out
 
 
