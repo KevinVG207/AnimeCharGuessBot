@@ -165,7 +165,7 @@ async def on_message(message):
                             user_arg = args.pop(0)
                         else:
                             user_arg = cur_arg
-                        if user_arg.startswith("<@!"):
+                        if user_arg.startswith("<@"):
                             # It's a ping
                             user_id = pingToID(user_arg)
                         else:
@@ -455,7 +455,11 @@ async def on_message(message):
 
 
 def pingToID(ping_string):
-    return int(ping_string[3:-1])
+    out = ""
+    for char in ping_string:
+        if char.isnumeric():
+            out += char
+    return int(out)
 
 
 def calcDropChance(user_count):
@@ -599,7 +603,7 @@ async def getUserInGuild(requested_user, guild):
     :param guild: Guild Object - The guild to search the user in.
     :return: User Object
     """
-    if requested_user.startswith("<@!"):
+    if requested_user.startswith("<@"):
         # It's a ping
         user_id = pingToID(requested_user)
     else:
