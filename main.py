@@ -145,7 +145,7 @@ async def on_message(message):
             return await message.channel.send(embed=embed)
 
     # These should only happen in the assigned channel
-    if message.channel.id == db.getAssignedChannelID(message.guild.id):
+    if not message.guild or message.channel.id == db.getAssignedChannelID(message.guild.id):
         if message.content == f"{PREFIX}waifus" or message.content.startswith(f"{PREFIX}waifus ") or \
                 message.content == f"{PREFIX}list" or message.content.startswith(f"{PREFIX}list "):
             if message.content.startswith(f"{PREFIX}waifus"):
@@ -171,6 +171,11 @@ async def on_message(message):
                         rarity = args.pop(0)
                         if rarity.isnumeric():
                             rarity = int(rarity)
+                            if rarity < 1:
+                                rarity = 1
+                            if rarity > 6:
+                                rarity = 6
+                            rarity -= 1
                         else:
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Rarity not a number."))
@@ -191,6 +196,8 @@ async def on_message(message):
                             user_id = user_arg
                         try:
                             # User in current Guild
+                            if not message.guild:
+                                return await message.reply(embed=makeEmbed("User Lookup Failed", "You cannot look for users in DMs."))
                             requested_member = await message.guild.fetch_member(user_id)
                             user_id = requested_member.id
                             user_name = requested_member.display_name
@@ -219,6 +226,10 @@ async def on_message(message):
                     cur_arg = args.pop(0)
                     if cur_arg == "-u":
                         user_arg = args.pop(0)
+
+                        if not message.guild:
+                            return await message.reply(
+                                embed=makeEmbed("User Lookup Failed", "You cannot look for users in DMs."))
 
                         requested_member = await getUserInGuild(user_arg, message.guild)
 
@@ -277,6 +288,11 @@ async def on_message(message):
                 user1 = message.author
                 user1_confirm = False
                 user1_offer = []
+
+                if not message.guild:
+                    return await message.reply(
+                        embed=makeEmbed("User Lookup Failed", "You cannot look for users in DMs."))
+
                 user2 = await getUserInGuild(message.content.split(" ", 1)[1], message.guild)
 
                 if not user2 or user1.id == user2.id:
@@ -484,6 +500,8 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                     user_id = user_arg
                 try:
                     # User in current Guild
+                    if not message.guild:
+                        return await message.reply(embed=makeEmbed("User Lookup Failed", "You cannot look for users in DMs."))
                     user = await message.guild.fetch_member(user_id)
                 except (discord.errors.NotFound, discord.errors.HTTPException):
                     # User not in current Guild
@@ -527,7 +545,7 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 return await message.reply(embed=makeEmbed("You Lose!", f"Too bad, you lost your wager.\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (-{wager})"))
 
     # Drops!
-    if not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
+    if message.guild and not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
         if numpyrand.random() < calcDropChance(message.guild.member_count):
             assigned_channel_id = db.getAssignedChannelID(message.guild.id)
             if assigned_channel_id:
