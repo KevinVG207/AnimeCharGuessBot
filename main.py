@@ -92,10 +92,12 @@ async def on_message(message):
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
                 "trade": "Start a trade offer with another user.",
                 "inspect": "View one of your collected waifus in more detail.",
-                "remove": "Let one of your waifus go.",
+                "remove": "Let one or more of your waifus go.",
                 "profile": "View your (or someone else's) profile.",
                 "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})",
-                "wager": f"Wager {CURRENCY} and have 50% chance to double it."
+                "wager": f"Wager {CURRENCY} and have 50% chance to double it.",
+                "fav": "Favorite a waifu.",
+                "unfav": "Unfavorite a waifu."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -124,7 +126,7 @@ async def on_message(message):
                 embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
             elif specific_command == "remove":
                 embed_title = f"Help for {PREFIX}remove"
-                embed_description = f"Let one of your waifus go. This will reward you {CURRENCY} depending on the rarity of the waifu.\n(1/4 of {CURRENCY} needed to roll that same rarity.)\nUsage: ``{PREFIX}remove [inventory number]``"
+                embed_description = f"Let one of your waifus go. This will reward you {CURRENCY} depending on the rarity of the waifu.\n(1/4 of {CURRENCY} needed to roll that same rarity.)\nUsages:\n``{PREFIX}remove [inventory number]``\n``{PREFIX}remove -s [show id]``"
             elif specific_command == "profile":
                 embed_title = f"Help for {PREFIX}profile"
                 embed_description = f"Display your profile page. Mention a user to see theirs.\nUsage: ``{PREFIX}profile [user ping or ID]``"
@@ -134,6 +136,12 @@ async def on_message(message):
             elif specific_command == "wager":
                 embed_title = f"Help for {PREFIX}wager"
                 embed_description = f"Wager credits with a 50% chance of doubling them. (Or losing them :P)\nUsage: ``{PREFIX}wager [amount]``"
+            elif specific_command == "fav":
+                embed_title = f"Help for {PREFIX}fav"
+                embed_description = f"Favorites a waifu from your inventory.\nUsage: ``{PREFIX}fav [inventory slot]``"
+            elif specific_command == "unfav":
+                embed_title = f"Help for {PREFIX}unfav"
+                embed_description = f"Unfavorites a waifu from your inventory.\nUsage: ``{PREFIX}unfav [inventory slot]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -158,34 +166,43 @@ async def on_message(message):
             cur_page = 0
             rarity = -1
             name_query = None
+            show_id = None
 
             # Arguments
             if args:
                 while len(args) > 0:
                     cur_arg = args.pop(0)
                     if cur_arg.startswith("-p"):
-                        page_arg = args.pop(0)
-                        if page_arg.isnumeric():
-                            cur_page = int(page_arg) - 1
+                        if args:
+                            page_arg = args.pop(0)
+                            if page_arg.isnumeric():
+                                cur_page = int(page_arg) - 1
+                    elif cur_arg.startswith("-s"):
+                        if args:
+                            show_arg = args.pop(0)
+                            if show_arg.isnumeric():
+                                show_id = int(show_arg)
                     elif cur_arg.startswith("-r"):
-                        rarity = args.pop(0)
-                        if rarity.isnumeric():
-                            rarity = int(rarity)
-                            if rarity < 1:
-                                rarity = 1
-                            if rarity > 6:
-                                rarity = 6
-                            rarity -= 1
-                        else:
-                            return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
-                                                                              "Rarity not a number."))
+                        if args:
+                            rarity = args.pop(0)
+                            if rarity.isnumeric():
+                                rarity = int(rarity)
+                                if rarity < 1:
+                                    rarity = 1
+                                if rarity > 6:
+                                    rarity = 6
+                                rarity -= 1
+                            else:
+                                return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
+                                                                                  "Rarity not a number."))
                     elif cur_arg.startswith("-n"):
                         name_args = args
                         args = []
                         name_query = " ".join(name_args)
                     elif not cur_arg.startswith("-") or cur_arg == "-u":
                         if cur_arg.startswith("-"):
-                            user_arg = args.pop(0)
+                            if args:
+                                user_arg = args.pop(0)
                         else:
                             user_arg = cur_arg
                         if user_arg.startswith("<@"):
@@ -205,7 +222,7 @@ async def on_message(message):
                             # User not in current Guild
                             return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
                                                                               "Requested user is not in this server."))
-            return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query)
+            return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query, show_id)
 
         elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
             args = getMessageArgs("inspect", message)
@@ -225,7 +242,8 @@ async def on_message(message):
                 while len(args) > 0:
                     cur_arg = args.pop(0)
                     if cur_arg == "-u":
-                        user_arg = args.pop(0)
+                        if args:
+                            user_arg = args.pop(0)
 
                         if not message.guild:
                             return await message.reply(
@@ -442,28 +460,74 @@ async def on_message(message):
                 message.content == f"{PREFIX}yeet" or message.content.startswith(f"{PREFIX}yeet "):
             args = getMessageArgs("remove", message) if message.content.startswith(f"{PREFIX}remove") \
                 else getMessageArgs("yeet", message)
-            if not args or len(args) > 1 or (not args[0].isnumeric() and int(args[0]) >= 1):
+            if not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
                                                                   f"Usage: ``{PREFIX}remove [inventory number]``"))
             else:
-                # One argument and it is numeric.
-                inventory_index = int(args[0])
-                selected_waifu = db.getWaifus(message.author.id, unpaginated=True, inventory_index=inventory_index)
-                if not selected_waifu:
+                inventory_index = None
+                show_id = None
+                selected_waifu = None
+                cur_arg = args.pop(0)
+                total_value = 0
+                if cur_arg == "-s":
+                    if args:
+                        show_arg = args.pop(0)
+                        if show_arg.isnumeric():
+                            show_id = int(show_arg)
+                else:
+                    index_arg = cur_arg
+                    if not index_arg.isnumeric():
+                        return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                          f"Usage: ``{PREFIX}remove [inventory number]``"))
+                    inventory_index = int(index_arg)
+                selected_waifus = db.getWaifus(message.author.id, unpaginated=True, inventory_index=inventory_index, show_id=show_id)
+                if not selected_waifus:
                     return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", "Could not find this waifu in your inventory."))
+
+                if len(selected_waifus) == 1:
+                    selected_waifu = selected_waifus[0]
+
+                    if selected_waifu["favorite"] == 1:
+                        return await message.reply(embed=makeEmbed("Remove Blocked", f"Selected character is a favorite.\nIf you want to remove them from favorites, use ``{PREFIX}unfav [inventory slot]``"))
+
+                    description = f"""You are about to remove {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
+Removing this waifu will award you **{db.getRarityCurrency(selected_waifu["rarity"])}** {CURRENCY}.
+If you agree with this removal, respond with ``yes``.
+Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
+                    embed = makeEmbed("Waifu Removal Confirmation", description)
+                    embed.set_thumbnail(url=selected_waifu["image_url"])
+                    await message.reply(embed=embed)
+
+                else:
+                    description = f"""You are about to remove:\n"""
+
+                    favorites = []
+                    true_remove = []
+
+                    for waifu in selected_waifus:
+                        if waifu["favorite"] == 1:
+                            favorites.append(waifu)
+                        else:
+                            true_remove.append(waifu)
+                        total_value += db.getRarityCurrency(waifu["rarity"])
+                        description += f"""{makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}\n"""
+                    description += f"""Removing these **{len(selected_waifus)}** waifus will award you **{total_value}** {CURRENCY}.\n"""
+
+                    if favorites:
+                        description += "\nIgnored favorites (won't be removed):\n"
+                        for favorite in favorites:
+                            description += f"""{makeRarityString(favorite["rarity"])} **{favorite["en_name"]}** #{favorite["image_index"]}{" :heart:" if waifu["favorite"] == 1 else ""}\n\n"""
+
+                    description += f"""If you agree with this removal, respond with ``yes``.
+Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
+                    embed = makeEmbed("Waifus Removal Confirmation", description)
+                    selected_waifus = true_remove
+                    await message.reply(embed=embed)
 
                 def userIsOriginalUser(m):
                     if m.author.id == message.author.id:
                         return True
                     return False
-
-                description = f"""You are about to remove {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
-Removing this waifu will award you **{db.getRarityCurrency(selected_waifu["rarity"])}** {CURRENCY}.
-If you agree with this removal, respond with ``yes``.
-Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
-                embed = makeEmbed("Waifu Removal Confirmation", description)
-                embed.set_thumbnail(url=selected_waifu["image_url"])
-                await message.reply(embed=embed)
 
                 confirm_message = None
                 try:
@@ -473,18 +537,27 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
 
                 if confirm_message and confirm_message.content.lower() == "yes":
                     # Remove waifu.
-                    if db.removeWaifu(selected_waifu["waifus_id"]):
-                        new_currency = db.getRarityCurrency(selected_waifu["rarity"])
-                        db.addUserCurrency(message.author.id, new_currency)
-                        embed = makeEmbed("Waifu Let Go", f"""**{selected_waifu["en_name"]}** has been let go.
-                        Your {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{new_currency})""")
-                        embed.set_thumbnail(url=selected_waifu["image_url"])
-                        return await confirm_message.reply(embed=embed)
+                    if len(selected_waifus) == 1:
+                        if db.removeWaifu(selected_waifu["waifus_id"]):
+                            new_currency = db.getRarityCurrency(selected_waifu["rarity"])
+                            db.addUserCurrency(message.author.id, new_currency)
+                            embed = makeEmbed("Waifu Let Go", f"""**{selected_waifu["en_name"]}** has been let go.\nYour {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{new_currency})""")
+                            embed.set_thumbnail(url=selected_waifu["image_url"])
+                            return await confirm_message.reply(embed=embed)
+                        else:
+                            return await message.channel.send(embed=makeEmbed("Removal Failed",
+                                                                              f"""Removal of **{selected_waifu["en_name"]}** failed."""))
                     else:
-                        return await message.channel.send(embed=makeEmbed("Removal Failed",
-                                                                          f"""Removal of **{selected_waifu["en_name"]}** failed."""))
+                        for waifu in selected_waifus:
+                            db.removeWaifu(waifu["waifus_id"])
+                        db.addUserCurrency(message.author.id, total_value)
+                        embed = makeEmbed("Waifus Let Go", f"""{len(selected_waifus)} waifus have been let go.\nYour {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{total_value})""")
+                        return await confirm_message.reply(embed=embed)
                 else:
-                    return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of **{selected_waifu["en_name"]}** has been cancelled."""))
+                    if len(selected_waifus) == 1:
+                        return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of **{selected_waifu["en_name"]}** has been cancelled."""))
+                    else:
+                        return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of {len(selected_waifus)} waifus has been cancelled."""))
 
         elif message.content == f"{PREFIX}profile" or message.content.startswith(f"{PREFIX}profile "):
             args = getMessageArgs("profile", message)
@@ -526,6 +599,38 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
             rolled_waifu, price = db.getDropData(price=price, user_id=message.author.id)
             db.addWaifu(message.author.id, rolled_waifu["image_id"], rolled_waifu["rarity"])
             return await message.reply(embed=makeRollEmbed(message.author, price, rolled_waifu))
+
+        elif message.content == f"{PREFIX}fav" or message.content.startswith(f"{PREFIX}fav "):
+            args = getMessageArgs("fav", message)
+            if not args or len(args) > 1 or not args[0].isnumeric():
+                return await message.reply(embed=makeEmbed("Favorite Failed", f"Usage: ``{PREFIX}fav [inventory slot]``"))
+            user_id = message.author.id
+
+            inventory_index = int(args[0])
+
+            selected_waifu = db.getWaifus(user_id, unpaginated=True, inventory_index=inventory_index)[0]
+            if not selected_waifu:
+                return await message.reply(embed=makeEmbed("Favorite Failed", "Could not find waifu with that inventory number."))
+            db.setFavorite(selected_waifu["waifus_id"])
+            embed = makeEmbed("Waifu Favorited", f"""``{selected_waifu["index"]}`` {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}\nadded to favorites.""")
+            embed.set_thumbnail(url=selected_waifu["image_url"])
+            return await message.reply(embed=embed)
+
+        elif message.content == f"{PREFIX}unfav" or message.content.startswith(f"{PREFIX}unfav "):
+            args = getMessageArgs("unfav", message)
+            if not args or len(args) > 1 or not args[0].isnumeric():
+                return await message.reply(embed=makeEmbed("Unfavorite Failed", f"Usage: ``{PREFIX}unfav [inventory slot]``"))
+            user_id = message.author.id
+
+            inventory_index = int(args[0])
+
+            selected_waifu = db.getWaifus(user_id, unpaginated=True, inventory_index=inventory_index)[0]
+            if not selected_waifu:
+                return await message.reply(embed=makeEmbed("Unfavorite Failed", "Could not find waifu with that inventory number."))
+            db.unFavorite(selected_waifu["waifus_id"])
+            embed = makeEmbed("Waifu Unfavorited", f"""``{selected_waifu["index"]}`` {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}\nremoved from favorites.""")
+            embed.set_thumbnail(url=selected_waifu["image_url"])
+            return await message.reply(embed=embed)
 
         elif message.content == f"{PREFIX}wager" or message.content.startswith(f"{PREFIX}wager "):
             args = getMessageArgs("wager", message)
@@ -634,8 +739,8 @@ def makeEmbed(title, desciption):
                          timestamp=datetime.datetime.utcnow())
 
 
-async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query):
-    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query)
+async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query, show_id):
+    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
     if total_pages < 0:
         return await message.channel.send(embed=embed)
     own_message = await message.channel.send(embed=embed)
@@ -657,7 +762,7 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, na
         new_page = cur_page + NAV_EMOJI[reaction.emoji]
         if not new_page < 0 and not new_page + 1 > total_pages:
             cur_page = new_page
-            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query)
+            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
             if total_pages < 0:
                 return await message.channel.send(embed=embed)
             await own_message.edit(embed=embed)
@@ -665,8 +770,8 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, na
     return
 
 
-def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
-    page_data = db.getWaifus(user_id, rarity, name_query, PROFILE_PAGE_SIZE)
+def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id):
+    page_data = db.getWaifus(user_id, rarity=rarity, name_query=name_query, page_size=PROFILE_PAGE_SIZE, show_id=show_id)
     if not page_data:
         return makeEmbed("404 Waifu Not Found",
                          f"""Selected user does not have any waifus that match the request...\nThey'd better claim some!"""), -1, -1
@@ -678,7 +783,7 @@ def getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query):
     message_strings = []
     for waifu in page:
         message_strings.append(
-            f"""``{waifu["index"]}`` {makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}""")
+            f"""``{waifu["index"]}`` {makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}{" :heart:" if waifu["favorite"] == 1 else ""}""")
         # message_strings.append(f"""**{waifu["en_name"]}**: {waifu["amount"]}x""")
     final_string = "\n".join(message_strings)
     return makeEmbed(

@@ -297,11 +297,24 @@ def divideWaifus(waifus_list, chunk_size):
         yield waifus_list[i:i + chunk_size]
 
 
-def getWaifus(user_id, rarity=None, name_query=None, page_size=25, unpaginated=False, inventory_index=None):
+def getWaifus(user_id, rarity=None, name_query=None, show_id=None, page_size=25, unpaginated=False, inventory_index=None):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
 
-    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url
+    if show_id:
+        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite, sc.show_id
+FROM waifus
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
+FROM character c
+LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+ON w.character_id = c.id) s
+ON waifus.images_id = s.id
+LEFT JOIN show_character sc
+ON sc.char_id = s.char_id
+WHERE waifus.user_id = ? AND sc.show_id = ?
+ORDER BY waifus.id;""", (user_id, show_id))
+    else:
+        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
 FROM waifus
 LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
 FROM character c
@@ -331,10 +344,14 @@ ORDER BY waifus.id;""", (user_id,))
                      "images_id": row[4],
                      "waifus_id": row[5],
                      "index": index,
-                     "image_url": row[6]}
+                     "image_url": row[6],
+                     "favorite": row[7]}
+
+        if show_id:
+            cur_waifu["show_id"] = row[8]
 
         if inventory_index and index == inventory_index:
-            return cur_waifu
+            return [cur_waifu]
 
         if not inventory_index:
             waifus.append(cur_waifu)
@@ -697,3 +714,21 @@ def addDailyCurrency():
     conn.close()
     for row in rows:
         addUserCurrency(row[0], DAILY_CURRENCY)
+
+
+def setFavorite(waifus_id):
+    conn, cursor = getConnection()
+
+    cursor.execute("""UPDATE waifus SET favorite = 1 WHERE id = ?""", (waifus_id,))
+
+    conn.commit()
+    conn.close()
+
+
+def unFavorite(waifus_id):
+    conn, cursor = getConnection()
+
+    cursor.execute("""UPDATE waifus SET favorite = 0 WHERE id = ?""", (waifus_id,))
+
+    conn.commit()
+    conn.close()
