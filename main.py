@@ -94,7 +94,8 @@ async def on_message(message):
                 "inspect": "View one of your collected waifus in more detail.",
                 "remove": "Let one of your waifus go.",
                 "profile": "View your (or someone else's) profile.",
-                "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})"
+                "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})",
+                "wager": f"Wager {CURRENCY} and have 50% chance to double it."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -130,6 +131,9 @@ async def on_message(message):
             elif specific_command == "roll":
                 embed_title = f"Help for {PREFIX}roll"
                 embed_description = f"""Perform a gacha roll with optional infusion of {CURRENCY}.\n(Default: 100, maximum: 15000)\nPrices for guaranteed rarities:\n``★★☆☆☆: 300``\n``★★★☆☆: 1000``\n``★★★★☆: 5000``\n``★★★★★: 15000``\nUsage: ``{PREFIX}roll [{CURRENCY}]``"""
+            elif specific_command == "wager":
+                embed_title = f"Help for {PREFIX}wager"
+                embed_description = f"Wager credits with a 50% chance of doubling them. (Or losing them :P)\nUsage: ``{PREFIX}wager [amount]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
