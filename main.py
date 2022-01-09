@@ -58,8 +58,8 @@ async def on_guild_remove(guild):
 @client.event
 async def on_message(message):
     """
-    TODO: Rarities.
-    TODO: Gacha rolls.
+    TODO: Favorite waifus with w.fav (can't be thrown away). And add a fav filter to w.list. (or w.favs)
+    TODO: w.profile set [number] to set a waifu on your profile.
     TODO: Add -s [show_id] to w.waifus
     TODO: Add lots of characters!
     TODO: Pagination for w.show with more than 25 characters.
@@ -497,6 +497,8 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 if len(args) > 1 or not args[0].isnumeric():
                     return await message.reply(embed=makeEmbed("Roll Failed", f"Usage: ``{PREFIX}roll [price]``"))
                 price = int(args[0])
+                if price < 100:
+                    return await message.reply(embed=makeEmbed("Roll Failed", f"Minimum roll price: 100 {CURRENCY}."))
             else:
                 price = 100
 
@@ -566,8 +568,10 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
                 db.addWaifu(guess.author.id, character_data["image_id"], character_data["rarity"])
+                random_bonus = round(numpyrand.uniform(25, 301))
+                db.addUserCurrency(guess.author.id, random_bonus)
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{len(db.getWaifus(guess.author.id, unpaginated=True))}``.""")
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{len(db.getWaifus(guess.author.id, unpaginated=True))}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")
                 embed.set_image(url=character_data["image_url"])
                 return await guess.reply(embed=embed)
 
