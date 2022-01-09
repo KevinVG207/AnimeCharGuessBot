@@ -3,7 +3,6 @@ import sqlite3
 import name_tools as nt
 from numpy import random as numpyrand
 
-
 DATABASE_URI = "database/database.db"
 
 
@@ -47,7 +46,8 @@ def insertCharacter(char_data, alt_name=None):
     print(f"Inserting character {char_id} {en_name}")
     conn, cursor = getConnection()
 
-    cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""", (char_id, en_name, jp_name, alt_name))
+    cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""",
+                   (char_id, en_name, jp_name, alt_name))
 
     for image_url in image_urls:
         cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?);""", (image_url, char_id))
@@ -96,6 +96,23 @@ def showExists(show_id):
     cursor.execute("""SELECT id FROM show WHERE id = ?;""", (show_id,))
     rows = cursor.fetchall()
     conn.close()
+    if not rows:
+        return False
+    else:
+        return True
+
+
+def waifuExists(waifus_id, connection=None):
+    if not connection:
+        conn, cursor = getConnection()
+    else:
+        conn, cursor = connection
+    cursor.execute("""SELECT id FROM waifus WHERE id = ?;""", (waifus_id,))
+    rows = cursor.fetchall()
+
+    if not connection:
+        conn.close()
+
     if not rows:
         return False
     else:
@@ -152,7 +169,9 @@ def canTrade(user_id):
 def getDropData(history=None):
     conn, cursor = getConnection()
     if history:
-        cursor.execute(f"""SELECT DISTINCT id FROM character WHERE droppable = 1 AND id NOT IN ({",".join(["?" for _ in history])});""", tuple(history))
+        cursor.execute(
+            f"""SELECT DISTINCT id FROM character WHERE droppable = 1 AND id NOT IN ({",".join(["?" for _ in history])});""",
+            tuple(history))
     else:
         cursor.execute("""SELECT DISTINCT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
@@ -264,15 +283,15 @@ def divideWaifus(waifus_list, chunk_size):
         yield waifus_list[i:i + chunk_size]
 
 
-def getWaifus(user_id, rarity=None, name_query=None, page_size=25, unpaginated=False):
+def getWaifus(user_id, rarity=None, name_query=None, page_size=25, unpaginated=False, inventory_index=None):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
 
-    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id
+    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url
 FROM waifus
-LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
 FROM character c
-LEFT JOIN (SELECT id, character_id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
 ON w.character_id = c.id) s
 ON waifus.images_id = s.id
 WHERE waifus.user_id = ?
@@ -288,15 +307,23 @@ ORDER BY waifus.id;""", (user_id,))
         if rarity and rarity >= 0:
             if row[2] != rarity:
                 continue
-        if name_query and nt.romanizationFix(name_query.lower()) not in nt.romanizationFix(row[0].lower()):
+        if name_query and (nt.romanizationFix(name_query.lower()) not in nt.romanizationFix(row[0].lower())):
             continue
-        waifus.append({"en_name": row[0],
-                       "image_index": row[1],
-                       "rarity": row[2],
-                       "char_id": row[3],
-                       "images_id": row[4],
-                       "waifus_id": row[5],
-                       "index": index})
+
+        cur_waifu = {"en_name": row[0],
+                     "image_index": row[1],
+                     "rarity": row[2],
+                     "char_id": row[3],
+                     "images_id": row[4],
+                     "waifus_id": row[5],
+                     "index": index,
+                     "image_url": row[6]}
+
+        if inventory_index and index == inventory_index:
+            return cur_waifu
+
+        if not inventory_index:
+            waifus.append(cur_waifu)
 
     if waifus:
         if unpaginated:
@@ -368,7 +395,8 @@ def insertShow(mal_id, jp_title, en_title, is_manga):
     conn, cursor = getConnection()
     print(f"Inserting show {mal_id} {en_title}, is_manga: {is_manga}")
 
-    cursor.execute("""INSERT INTO show (mal_id, jp_title, en_title, is_manga) VALUES (?,?,?,?)""", (mal_id, jp_title, en_title, is_manga))
+    cursor.execute("""INSERT INTO show (mal_id, jp_title, en_title, is_manga) VALUES (?,?,?,?)""",
+                   (mal_id, jp_title, en_title, is_manga))
 
     conn.commit()
     conn.close()
@@ -417,7 +445,8 @@ where sc.id is null;""")
 def getShowsLike(search_query):
     conn, cursor = getConnection()
     wildcard_query = f"%{search_query}%"
-    cursor.execute("""SELECT id, jp_title, is_manga FROM show WHERE jp_title LIKE ? or en_title LIKE ? LIMIT 25""", (wildcard_query, wildcard_query))
+    cursor.execute("""SELECT id, jp_title, is_manga FROM show WHERE jp_title LIKE ? or en_title LIKE ? LIMIT 25""",
+                   (wildcard_query, wildcard_query))
     rows = cursor.fetchall()
     conn.close()
     if not rows:
@@ -558,3 +587,17 @@ def removeUselessWaifus():
 
     conn.commit()
     conn.close()
+
+
+def removeWaifu(waifus_id):
+    if not waifuExists(waifus_id):
+        return False
+
+    conn, cursor = getConnection()
+
+    cursor.execute("""DELETE FROM waifus WHERE id = ?;""", (waifus_id,))
+
+    conn.commit()
+    conn.close()
+
+    return True

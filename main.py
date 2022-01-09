@@ -17,6 +17,7 @@ DROP_TIMEOUT = 5 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w."
+REMOVAL_TIMEOUT = 15
 TRADE_TIMEOUT = 60
 HISTORY_SIZE = 500
 
@@ -89,7 +90,8 @@ async def on_message(message):
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
                 "trade": "Start a trade offer with another user.",
-                "inspect": "View one of your collected waifus in more detail."
+                "inspect": "View one of your collected waifus in more detail.",
+                "remove": "Let one of your waifus go."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -116,6 +118,9 @@ async def on_message(message):
             elif specific_command == "trade":
                 embed_title = f"Help for {PREFIX}trade"
                 embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
+            elif specific_command == "remove":
+                embed_title = f"Help for {PREFIX}remove"
+                embed_description = f"Let one of your waifus go.\nUsage: ``{PREFIX}remove [inventory number]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -403,6 +408,50 @@ async def on_message(message):
                         return await message.channel.send(embed=makeEmbed("Trade Failed",
                                                                           "Something went wrong. The trade has been cancelled."))
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
+
+        elif message.content == f"{PREFIX}remove" or message.content.startswith(f"{PREFIX}remove "):
+            args = getMessageArgs("remove", message)
+            if not args or len(args) > 1 or (not args[0].isnumeric() and int(args[0]) >= 1):
+                return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                  f"Usage: ``{PREFIX}remove [inventory number]``"))
+            else:
+                # One argument and it is numeric.
+                inventory_index = int(args[0])
+                selected_waifu = db.getWaifus(message.author.id, unpaginated=True, inventory_index=inventory_index)
+                if not selected_waifu:
+                    return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", "Could not find this waifu in your inventory."))
+
+                def userIsOriginalUser(m):
+                    if m.author.id == message.author.id:
+                        return True
+                    return False
+
+                description = f"""You are about to remove {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
+                Removing this waifu will give you NUMBER credits.
+                If you agree with this removal, respond with ``yes``.
+                Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
+                embed = makeEmbed("Waifu Removal Confirmation", description)
+                embed.set_thumbnail(url=selected_waifu["image_url"])
+                await message.reply(embed=embed)
+
+                confirm_message = None
+                try:
+                    confirm_message = await client.wait_for("message", check=userIsOriginalUser, timeout=REMOVAL_TIMEOUT)
+                except asyncio.TimeoutError:
+                    pass
+
+                if confirm_message and confirm_message.content.lower() == "yes":
+                    # Remove waifu.
+                    if db.removeWaifu(selected_waifu["waifus_id"]):
+                        embed = makeEmbed("Waifu Let Go", f"""**{selected_waifu["en_name"]}** has been let go.
+                        Your credits: **NUMBER** (+NEW)""")
+                        embed.set_thumbnail(url=selected_waifu["image_url"])
+                        return await confirm_message.reply(embed=embed)
+                    else:
+                        return await message.channel.send(embed=makeEmbed("Removal Failed",
+                                                                          f"""Removal of **{selected_waifu["en_name"]}** failed."""))
+                else:
+                    return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of **{selected_waifu["en_name"]}** has been cancelled."""))
 
     # Drops!
     if not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
