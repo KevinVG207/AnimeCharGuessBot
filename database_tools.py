@@ -5,6 +5,7 @@ from numpy import random as numpyrand
 
 DATABASE_URI = "database/database.db"
 
+DAILY_CURRENCY = 500
 
 def getConnection():
     conn = sqlite3.connect(DATABASE_URI)
@@ -166,7 +167,7 @@ def canTrade(user_id):
         return False
 
 
-def getDropData(history=None):
+def getDropData(history=None, price=None, user_id=None):
     conn, cursor = getConnection()
     if history:
         cursor.execute(
@@ -196,19 +197,32 @@ def getDropData(history=None):
     LEFT JOIN images ON character.id = images.character_id
     WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     rows2 = cursor.fetchall()
+
     conn.close()
+
     random.shuffle(rows2)
     image_url = rows2[0][0]
     en_name = rows2[0][1]
     alt_name = rows2[0][2]
     image_id = rows2[0][3]
-    rarity = generateRarity()
-    return {"char_id": char_id,
-            "image_url": image_url,
-            "en_name": en_name,
-            "alt_name": alt_name,
-            "image_id": image_id,
-            "rarity": rarity}
+    rarity, price = generateRarity(price)
+
+    cur_waifu = {"char_id": char_id,
+                 "image_url": image_url,
+                 "en_name": en_name,
+                 "alt_name": alt_name,
+                 "image_id": image_id,
+                 "rarity": rarity}
+
+    if price and user_id:
+        # We are rolling.
+        # Deduct price
+
+        subtractUserCurrency(user_id, price)
+
+        return cur_waifu, price
+
+    return cur_waifu
 
 
 def disableDrops(guild_id):
@@ -522,10 +536,41 @@ def updateHistory(guild_id, history):
 
 
 def generateRarity(price=None):
-    # Thanks Lunarmagpie
-    count, weights = zip(*enumerate((750, 250, 75, 15, 5, 1)))
-    rarity = next(iter(random.choices(count, weights=weights)))
-    return rarity
+    max_number = 1.0
+
+    if price and price >= 100:
+        if price > 15000:
+            price = 15000
+
+        if price > 5000:
+            # Slope from 0.015 to 0.005 at 15000
+            max_number = (0.005 - 0.015) / (15000 - 5000) * price + 0.02
+        elif price > 1000:
+            # Slope from 0.075 to 0.015
+            max_number = (0.015 - 0.075) / (5000 - 1000) * price + 0.09
+        elif price > 300:
+            # Slope from 0.25 to 0.075
+            max_number = (0.075 - 0.25) / (1000 - 300) * price + 0.325
+        else:
+            # Slope from 0.75 to 0.25
+            max_number = (0.25 - 0.75) / (300 - 100) * price + 1
+
+    random_number = numpyrand.uniform(0.0, max_number)
+
+    if random_number < 0.001:
+        rarity = 5
+    elif random_number < 0.005:
+        rarity = 4
+    elif random_number < 0.015:
+        rarity = 3
+    elif random_number < 0.075:
+        rarity = 2
+    elif random_number < 0.25:
+        rarity = 1
+    else:
+        rarity = 0
+
+    return rarity, price
 
 
 def generateRaritiesForUnsetWaifus():
@@ -538,7 +583,7 @@ def generateRaritiesForUnsetWaifus():
     conn, cursor = getConnection()
     for row in rows:
         waifu_id = row[0]
-        rarity = generateRarity()
+        rarity, price = generateRarity()
         cursor.execute("""UPDATE waifus SET rarity = ? WHERE id = ?""", (rarity, waifu_id))
     conn.commit()
     conn.close()
@@ -601,3 +646,54 @@ def removeWaifu(waifus_id):
     conn.close()
 
     return True
+
+
+def getUserCurrency(user_id):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT currency FROM user WHERE id = ?;""", (user_id,))
+    rows = cursor.fetchall()
+
+    conn.commit()
+    conn.close()
+
+    return rows[0][0]
+
+
+def addUserCurrency(user_id, amount):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET currency = currency + ? WHERE id = ?;""", (amount, user_id))
+    conn.commit()
+    conn.close()
+    return
+
+
+def subtractUserCurrency(user_id, amount):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET currency = currency - ? WHERE id = ?;""", (amount, user_id))
+    conn.commit()
+    conn.close()
+    return
+
+
+def getRarityCurrency(rarity):
+    exchange_rates = {
+        0: 100/4,
+        1: 300/4,
+        2: 1000/4,
+        3: 5000/4,
+        4: 15000/4,
+        5: 75000/4
+    }
+    return round(exchange_rates[rarity])
+
+
+def addDailyCurrency():
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT id FROM user;""")
+    rows = cursor.fetchall()
+    conn.close()
+    for row in rows:
+        addUserCurrency(row[0], DAILY_CURRENCY)

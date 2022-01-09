@@ -11,6 +11,7 @@ import database_tools as db
 import name_tools as nt
 from numpy import random as numpyrand
 
+CURRENCY = "credits"
 DROP_CHANCE = 0.1
 EMBED_COLOR = discord.Color.red()
 DROP_TIMEOUT = 5 * 60.0  # 3600.0
@@ -91,7 +92,9 @@ async def on_message(message):
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
                 "trade": "Start a trade offer with another user.",
                 "inspect": "View one of your collected waifus in more detail.",
-                "remove": "Let one of your waifus go."
+                "remove": "Let one of your waifus go.",
+                "profile": "View your (or someone else's) profile.",
+                "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})"
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -120,7 +123,20 @@ async def on_message(message):
                 embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
             elif specific_command == "remove":
                 embed_title = f"Help for {PREFIX}remove"
-                embed_description = f"Let one of your waifus go.\nUsage: ``{PREFIX}remove [inventory number]``"
+                embed_description = f"Let one of your waifus go. This will reward you {CURRENCY} depending on the rarity of the waifu.\n(1/4 of {CURRENCY} needed to roll that same rarity.)\nUsage: ``{PREFIX}remove [inventory number]``"
+            elif specific_command == "profile":
+                embed_title = f"Help for {PREFIX}profile"
+                embed_description = f"Display your profile page. Mention a user to see theirs.\nUsage: ``{PREFIX}profile [user ping or ID]``"
+            elif specific_command == "roll":
+                embed_title = f"Help for {PREFIX}roll"
+                embed_description = f"""Perform a gacha roll with optional infusion of {CURRENCY}.
+                (Default: 100, maximum: 15000)
+                Prices for guaranteed rarities:
+                ``★★☆☆☆: 300``
+                ``★★★☆☆: 1000``
+                ``★★★★☆: 5000``
+                ``★★★★★: 15000``
+                Usage: ``{PREFIX}roll [{CURRENCY}]``"""
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -409,8 +425,10 @@ async def on_message(message):
                                                                           "Something went wrong. The trade has been cancelled."))
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
 
-        elif message.content == f"{PREFIX}remove" or message.content.startswith(f"{PREFIX}remove "):
-            args = getMessageArgs("remove", message)
+        elif message.content == f"{PREFIX}remove" or message.content.startswith(f"{PREFIX}remove ") or \
+                message.content == f"{PREFIX}yeet" or message.content.startswith(f"{PREFIX}yeet "):
+            args = getMessageArgs("remove", message) if message.content.startswith(f"{PREFIX}remove") \
+                else getMessageArgs("yeet", message)
             if not args or len(args) > 1 or (not args[0].isnumeric() and int(args[0]) >= 1):
                 return await message.channel.send(embed=makeEmbed("Command failed.",
                                                                   f"Usage: ``{PREFIX}remove [inventory number]``"))
@@ -427,7 +445,7 @@ async def on_message(message):
                     return False
 
                 description = f"""You are about to remove {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
-                Removing this waifu will give you NUMBER credits.
+                Removing this waifu will award you **{db.getRarityCurrency(selected_waifu["rarity"])}** {CURRENCY}.
                 If you agree with this removal, respond with ``yes``.
                 Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
                 embed = makeEmbed("Waifu Removal Confirmation", description)
@@ -443,8 +461,10 @@ async def on_message(message):
                 if confirm_message and confirm_message.content.lower() == "yes":
                     # Remove waifu.
                     if db.removeWaifu(selected_waifu["waifus_id"]):
+                        new_currency = db.getRarityCurrency(selected_waifu["rarity"])
+                        db.addUserCurrency(message.author.id, new_currency)
                         embed = makeEmbed("Waifu Let Go", f"""**{selected_waifu["en_name"]}** has been let go.
-                        Your credits: **NUMBER** (+NEW)""")
+                        Your {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{new_currency})""")
                         embed.set_thumbnail(url=selected_waifu["image_url"])
                         return await confirm_message.reply(embed=embed)
                     else:
@@ -452,6 +472,43 @@ async def on_message(message):
                                                                           f"""Removal of **{selected_waifu["en_name"]}** failed."""))
                 else:
                     return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of **{selected_waifu["en_name"]}** has been cancelled."""))
+
+        elif message.content == f"{PREFIX}profile" or message.content.startswith(f"{PREFIX}profile "):
+            args = getMessageArgs("profile", message)
+
+            user = message.author
+            if args:
+                user_arg = args[0]
+                if user_arg.startswith("<@"):
+                    # It's a ping
+                    user_id = pingToID(user_arg)
+                else:
+                    # Assume it's an ID
+                    user_id = user_arg
+                try:
+                    # User in current Guild
+                    user = await message.guild.fetch_member(user_id)
+                except (discord.errors.NotFound, discord.errors.HTTPException):
+                    # User not in current Guild
+                    return await message.channel.send(embed=makeEmbed("Profile Lookup Failed",
+                                                                      "Requested user is not in this server."))
+            return await message.channel.send(embed=makeProfileEmbed(user))
+
+        elif message.content == f"{PREFIX}roll" or message.content.startswith(f"{PREFIX}roll "):
+            args = getMessageArgs("roll", message)
+            if args:
+                if len(args) > 1 or not args[0].isnumeric():
+                    return await message.reply(embed=makeEmbed("Roll Failed", f"Usage: ``{PREFIX}roll [price]``"))
+                price = int(args[0])
+            else:
+                price = 100
+
+            current_user_currency = db.getUserCurrency(message.author.id)
+            if current_user_currency < price:
+                return await message.reply(embed=makeEmbed("Roll Failed", f"Not enough {CURRENCY}.\nCurrently: **{current_user_currency}**"))
+            rolled_waifu, price = db.getDropData(price=price, user_id=message.author.id)
+            db.addWaifu(message.author.id, rolled_waifu["image_id"], rolled_waifu["rarity"])
+            return await message.reply(embed=makeRollEmbed(message.author, price, rolled_waifu))
 
     # Drops!
     if not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
@@ -704,6 +761,28 @@ def makeRarityString(rarity):
         out = "✪✪✪✪✪"
 
     return out
+
+
+def makeProfileEmbed(user):
+
+    title = f"""{user.display_name}'s Profile"""
+    descr = f"""{CURRENCY.capitalize()}: {db.getUserCurrency(user.id)}"""
+
+    embed = makeEmbed(title, descr)
+    embed.set_thumbnail(url=user.avatar_url)
+    return embed
+
+
+def makeRollEmbed(user, price, rolled_waifu):
+    title = f"{user.display_name}'s Gacha Roll!"
+    descr = f"""You rolled **{rolled_waifu["en_name"]}**.
+    {makeRarityString(rolled_waifu["rarity"])}
+    [MyAnimeList](https://myanimelist.net/character/{rolled_waifu["char_id"]})
+    Your {CURRENCY}: **{db.getUserCurrency(user.id)}** (-{price})"""
+
+    embed = makeEmbed(title, descr)
+    embed.set_image(url=rolled_waifu["image_url"])
+    return embed
 
 
 client.run(bot_token.getToken())
