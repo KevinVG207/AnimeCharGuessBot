@@ -169,7 +169,7 @@ def canTrade(user_id):
 
 def canRemove(user_id):
     conn, cursor = getConnection()
-    cursor.execute("""SELECT can_remove FROM user WHERE id = ? AND can_trade = 1;""", (user_id,))
+    cursor.execute("""SELECT can_remove FROM user WHERE id = ? AND can_remove = 1;""", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     if rows:

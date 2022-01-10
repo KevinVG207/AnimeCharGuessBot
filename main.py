@@ -93,7 +93,7 @@ async def on_message(message):
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
                 "trade": "Start a trade offer with another user.",
-                "inspect": "View one of your collected waifus in more detail.",
+                "view": "View one of your collected waifus in more detail.",
                 "remove": "Let one or more of your waifus go.",
                 "profile": "View your (or someone else's) profile.",
                 "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})",
@@ -114,9 +114,9 @@ async def on_message(message):
             if specific_command == "waifus" or specific_command == "list":
                 embed_title = f"Help for {PREFIX}waifus"
                 embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -r [rarity number] -p [page number] -n [part of name (MUST BE FINAL ARGUMENT cuz I'm lazy)]``"
-            elif specific_command == "inspect":
-                embed_title = f"Help for {PREFIX}inspect"
-                embed_description = f"Inspect a collected waifu in more detail.\nUsage: ``{PREFIX}inspect [inventory number] -u [user ping or ID]``"
+            elif specific_command == "view":
+                embed_title = f"Help for {PREFIX}view"
+                embed_description = f"View a collected waifu in more detail.\nUsage: ``{PREFIX}view [inventory number] -u [user ping or ID]``"
             elif specific_command == "search":
                 embed_title = f"Help for {PREFIX}search"
                 embed_description = f"Look for shows that the bot has characters of.\nUsage: ``{PREFIX}search [anime/manga name]``"
@@ -226,20 +226,20 @@ async def on_message(message):
                                                                               "Requested user is not in this server."))
             return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query, show_id)
 
-        elif message.content == f"{PREFIX}inspect" or message.content.startswith(f"{PREFIX}inspect "):
-            args = getMessageArgs("inspect", message)
+        elif message.content == f"{PREFIX}view" or message.content.startswith(f"{PREFIX}view "):
+            args = getMessageArgs("view", message)
             user_id = message.author.id
             user_name = message.author.display_name
             inventory_index = 0
             # Arguments
             if not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                  f"Usage: ``{PREFIX}inspect [number] (optional: -u @ping/user_id)``"))
+                                                                  f"Usage: ``{PREFIX}view [number] (optional: -u @ping/user_id)``"))
             else:
                 inventory_arg = args.pop(0)
                 if not inventory_arg.isnumeric():
                     return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                      f"Usage: ``{PREFIX}inspect [number]``"))
+                                                                      f"Usage: ``{PREFIX}view [number]``"))
                 inventory_index = int(inventory_arg)
                 while len(args) > 0:
                     cur_arg = args.pop(0)
@@ -302,8 +302,10 @@ async def on_message(message):
 
         elif message.content == f"{PREFIX}trade" or message.content.startswith(f"{PREFIX}trade "):
             if db.canTrade(message.author.id):
+                if not db.canRemove(message.author.id):
+                    return await message.reply(embed=makeEmbed("Command failed.", "Cannot initate trade while removing waifus."))
                 if not message.content.startswith(f"{PREFIX}trade "):
-                    return await message.channel.send(
+                    return await message.reply(
                         embed=makeEmbed("Command failed.", f"Usage: ``{PREFIX}trade [user]``"))
                 user1 = message.author
                 user1_confirm = False
@@ -324,8 +326,11 @@ async def on_message(message):
                 cancel = False
                 timeout = False
 
-                db.disableTrade(user1.id)
-                db.disableTrade(user2.id)
+                if db.canTrade(user1.id) and db.canRemove(user1.id) and db.canTrade(user2.id) and db.canRemove(user2.id):
+                    db.disableTrade(user1.id)
+                    db.disableTrade(user2.id)
+                else:
+                    return await message.channel.send(makeEmbed("Something went wrong.", "Unable to perform action."))
 
                 def receiveTradeMessage(m):
                     if m.channel.id == message.channel.id:
@@ -457,14 +462,22 @@ async def on_message(message):
                         return await message.channel.send(embed=makeEmbed("Trade Failed",
                                                                           "Something went wrong. The trade has been cancelled."))
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
+            else:
+                if not message.content.startswith(f"{PREFIX}trade cancel"):
+                    return await message.reply(
+                    embed=makeEmbed("Command failed.", "You are already in an active trade."))
 
         elif message.content == f"{PREFIX}remove" or message.content.startswith(f"{PREFIX}remove ") or \
                 message.content == f"{PREFIX}yeet" or message.content.startswith(f"{PREFIX}yeet "):
             args = getMessageArgs("remove", message) if message.content.startswith(f"{PREFIX}remove") \
                 else getMessageArgs("yeet", message)
-            if not db.canRemove(message.author.id) or not args:
-                return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                  f"Usage: ``{PREFIX}remove [inventory number]``"))
+            if not args:
+                return await message.reply(embed=makeEmbed("Command failed.",
+                                                                  f"Usages:\n``{PREFIX}remove [inventory number]``\n``{PREFIX}remove -s [show id]``"))
+            if not db.canRemove(message.author.id):
+                return await message.reply(embed=makeEmbed("Command failed.", "You are already removing right now."))
+            if not db.canTrade(message.author.id):
+                return await message.reply(embed=makeEmbed("Command failed.", "Cannot remove while trading with someone."))
             else:
                 inventory_index = None
                 show_id = None
@@ -480,16 +493,16 @@ async def on_message(message):
                     index_arg = cur_arg
                     if not index_arg.isnumeric():
                         return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                          f"Usage: ``{PREFIX}remove [inventory number]``"))
+                                                                          f"Usages:\n``{PREFIX}remove [inventory number]``\n``{PREFIX}remove -s [show id]``"))
                     inventory_index = int(index_arg)
                 selected_waifus = db.getWaifus(message.author.id, unpaginated=True, inventory_index=inventory_index, show_id=show_id)
                 if not selected_waifus:
                     return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", "Could not find this waifu in your inventory."))
 
-                if db.canRemove(message.author.id):
+                if db.canRemove(message.author.id) and db.canTrade(message.author.id):
                     db.disableRemove(message.author.id)
                 else:
-                    return await message.channel.send(makeEmbed("Something went wrong.", "You are already removing waifus."))
+                    return await message.channel.send(makeEmbed("Something went wrong.", "Unable to perform action."))
 
                 if not show_id:
                     selected_waifu = selected_waifus[0]
