@@ -28,8 +28,9 @@ handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w"
 handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s"))
 logger.addHandler(handler)
 
-client = discord.Client()
-client.intents.members = True
+intents = discord.Intents().all()
+
+client = discord.Client(intents=intents)
 
 random.seed()
 
@@ -740,10 +741,10 @@ def makeEmbed(title, desciption):
 
 
 async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query, show_id):
-    embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
+    org_embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
     if total_pages < 0:
-        return await message.channel.send(embed=embed)
-    own_message = await message.channel.send(embed=embed)
+        return await message.channel.send(embed=org_embed)
+    own_message = await message.channel.send(embed=org_embed)
     await own_message.add_reaction(NAV_LEFT_EMOJI)
     await own_message.add_reaction(NAV_RIGHT_EMOJI)
 
@@ -760,13 +761,24 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, na
             break
         # Reaction received, edit message.
         new_page = cur_page + NAV_EMOJI[reaction.emoji]
-        if not new_page < 0 and not new_page + 1 > total_pages:
-            cur_page = new_page
-            embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
-            if total_pages < 0:
-                return await message.channel.send(embed=embed)
-            await own_message.edit(embed=embed)
-        await own_message.remove_reaction(reaction, user)
+
+        if new_page < 0:
+            new_page = total_pages - 1
+        elif new_page + 1 > total_pages:
+            new_page = 0
+
+        cur_page = new_page
+        embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
+        if total_pages < 0:
+            return await message.channel.send(embed=embed)
+        await own_message.edit(embed=embed)
+        if message.guild:
+            await own_message.remove_reaction(reaction, user)
+        else:
+            # Workaround because you cannot remove another user's reactions in a DM channel.
+            own_message = await message.channel.send(embed=org_embed)
+            await own_message.add_reaction(NAV_LEFT_EMOJI)
+            await own_message.add_reaction(NAV_RIGHT_EMOJI)
     return
 
 
