@@ -167,6 +167,17 @@ def canTrade(user_id):
         return False
 
 
+def canRemove(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""SELECT can_remove FROM user WHERE id = ? AND can_trade = 1;""", (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    if rows:
+        return True
+    else:
+        return False
+
+
 def getDropData(history=None, price=None, user_id=None):
     conn, cursor = getConnection()
     if history:
@@ -253,6 +264,20 @@ def disableTrade(user_id):
     conn.close()
 
 
+def enableRemove(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_remove = 1 WHERE id = ?;""", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def disableRemove(user_id):
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_remove = 0 WHERE id = ?;""", (user_id,))
+    conn.commit()
+    conn.close()
+
+
 def enableAllDrops():
     conn, cursor = getConnection()
     cursor.execute("""UPDATE guild SET can_drop = 1;""")
@@ -263,6 +288,13 @@ def enableAllDrops():
 def enableAllTrades():
     conn, cursor = getConnection()
     cursor.execute("""UPDATE user SET can_trade = 1;""")
+    conn.commit()
+    conn.close()
+
+
+def enableAllRemoves():
+    conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET can_remove = 1;""")
     conn.commit()
     conn.close()
 
@@ -300,7 +332,25 @@ def divideWaifus(waifus_list, chunk_size):
 def getWaifus(user_id, rarity=None, name_query=None, show_id=None, page_size=25, unpaginated=False, inventory_index=None):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
+
+    if show_id:
+        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite, sc.show_id
+FROM waifus
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
+FROM character c
+LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+ON w.character_id = c.id) s
+ON waifus.images_id = s.id
+LEFT JOIN (
+    SELECT char_id, show_id
+    FROM show_character
+    WHERE show_id = ?
+    ) sc
+ON sc.char_id = s.char_id
+WHERE waifus.user_id = ?
+ORDER BY waifus.id;""", (show_id, user_id))
+    else:
+        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
 FROM waifus
 LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
 FROM character c
@@ -333,7 +383,7 @@ ORDER BY waifus.id;""", (user_id,))
                      "favorite": row[7]}
 
         if show_id:
-            if int(show_id) in getShowsFromCharacter(cur_waifu["char_id"]):
+            if row[8] is not None:
                 cur_waifu["show_id"] = show_id
             else:
                 continue
@@ -674,12 +724,14 @@ def addUserCurrency(user_id, amount):
     cursor.execute("""UPDATE user SET currency = currency + ? WHERE id = ?;""", (amount, user_id))
     conn.commit()
     conn.close()
+    print(f"Added {amount} to {user_id}")
     return
 
 
 def subtractUserCurrency(user_id, amount):
     conn, cursor = getConnection()
     cursor.execute("""UPDATE user SET currency = currency - ? WHERE id = ?;""", (amount, user_id))
+    print(f"Subtracted {amount} from {user_id}")
     conn.commit()
     conn.close()
     return

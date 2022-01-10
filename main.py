@@ -46,6 +46,7 @@ NAV_EMOJI = {
 async def on_ready():
     db.enableAllDrops()
     db.enableAllTrades()
+    db.enableAllRemoves()
     print(f"Bot has logged in as {client.user}")
     for g in client.guilds:
         print(g.name, g.id)
@@ -461,7 +462,7 @@ async def on_message(message):
                 message.content == f"{PREFIX}yeet" or message.content.startswith(f"{PREFIX}yeet "):
             args = getMessageArgs("remove", message) if message.content.startswith(f"{PREFIX}remove") \
                 else getMessageArgs("yeet", message)
-            if not args:
+            if not db.canRemove(message.author.id) or not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
                                                                   f"Usage: ``{PREFIX}remove [inventory number]``"))
             else:
@@ -485,10 +486,16 @@ async def on_message(message):
                 if not selected_waifus:
                     return await message.channel.send(embed=makeEmbed("404 Waifu Not Found", "Could not find this waifu in your inventory."))
 
-                if len(selected_waifus) == 1:
+                if db.canRemove(message.author.id):
+                    db.disableRemove(message.author.id)
+                else:
+                    return await message.channel.send(makeEmbed("Something went wrong.", "You are already removing waifus."))
+
+                if not show_id:
                     selected_waifu = selected_waifus[0]
 
                     if selected_waifu["favorite"] == 1:
+                        db.enableRemove(message.author.id)
                         return await message.reply(embed=makeEmbed("Remove Blocked", f"""``{selected_waifu["index"]}`` **{selected_waifu["en_name"]}** is a favorite.\nIf you want to remove them from favorites, use ``{PREFIX}unfav [inventory slot]``"""))
 
                     description = f"""You are about to remove ``{selected_waifu["index"]}`` {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
@@ -538,26 +545,38 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
 
                 if confirm_message and confirm_message.content.lower() == "yes":
                     # Remove waifu.
-                    if len(selected_waifus) == 1:
+                    if not show_id:
                         if db.removeWaifu(selected_waifu["waifus_id"]):
                             new_currency = db.getRarityCurrency(selected_waifu["rarity"])
                             db.addUserCurrency(message.author.id, new_currency)
                             embed = makeEmbed("Waifu Let Go", f"""**{selected_waifu["en_name"]}** has been let go.\nYour {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{new_currency})""")
                             embed.set_thumbnail(url=selected_waifu["image_url"])
+                            db.enableRemove(message.author.id)
                             return await confirm_message.reply(embed=embed)
                         else:
+                            db.enableRemove(message.author.id)
                             return await message.channel.send(embed=makeEmbed("Removal Failed",
                                                                               f"""Removal of **{selected_waifu["en_name"]}** failed."""))
                     else:
+                        total_paid = 0
+                        total_removed = 0
                         for waifu in selected_waifus:
-                            db.removeWaifu(waifu["waifus_id"])
-                        db.addUserCurrency(message.author.id, total_value)
+                            if not db.removeWaifu(waifu["waifus_id"]):
+                                db.enableRemove(message.author.id)
+                                return await confirm_message.reply(embed=makeEmbed("Whoops", f"""Something went wrong. (Removing nonexistent waifu?)\nStopped at waifu {waifu["waifus_id"]}.\nLet go of first {total_removed} waifus and paid out {total_paid}"""))
+                            cur_pay = db.getRarityCurrency(waifu["rarity"])
+                            db.addUserCurrency(message.author.id, cur_pay)
+                            total_paid += cur_pay
+                            total_removed += 1
                         embed = makeEmbed("Waifus Let Go", f"""{len(selected_waifus)} waifus have been let go.\nYour {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (+{total_value})""")
+                        db.enableRemove(message.author.id)
                         return await confirm_message.reply(embed=embed)
                 else:
-                    if len(selected_waifus) == 1:
+                    if not show_id:
+                        db.enableRemove(message.author.id)
                         return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of **{selected_waifu["en_name"]}** has been cancelled."""))
                     else:
+                        db.enableRemove(message.author.id)
                         return await message.channel.send(embed=makeEmbed("Removal Cancelled", f"""Removal of {len(selected_waifus)} waifus has been cancelled."""))
 
         elif message.content == f"{PREFIX}profile" or message.content.startswith(f"{PREFIX}profile "):
@@ -839,7 +858,7 @@ def makeShowsListEmbed(shows_list):
     shows_strings = []
     for show in shows_list:
         shows_strings.append(
-            f"""{show["id"]} | **{show["jp_title"]}** ({"Anime" if not show["is_manga"] else "Manga"})""")
+            f"""``{show["id"]}`` **{show["jp_title"]}** ({"Anime" if not show["is_manga"] else "Manga"})""")
 
     embed = makeEmbed("Show Search", "\n".join(shows_strings))
     return embed
@@ -849,7 +868,7 @@ def makeShowWaifusEmbed(show_title_jp, characters):
     characters_string = []
     for character in characters:
         characters_string.append(
-            f"""**{character["en_name"]}** | {character["image_count"]} image{"s" if character["image_count"] > 1 else ""}""")
+            f"""``{character["char_id"]}`` **{character["en_name"]}** | {character["image_count"]} image{"s" if character["image_count"] > 1 else ""}""")
     embed = makeEmbed(f"{show_title_jp}", "\n".join(characters_string))
     return embed
 
