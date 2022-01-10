@@ -17,7 +17,7 @@ EMBED_COLOR = discord.Color.red()
 DROP_TIMEOUT = 5 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
-PREFIX = "w."
+PREFIX = "w." if not bot_token.isDebug() else bot_token.getPrefix()
 REMOVAL_TIMEOUT = 15
 TRADE_TIMEOUT = 60
 HISTORY_SIZE = 500
@@ -489,9 +489,9 @@ async def on_message(message):
                     selected_waifu = selected_waifus[0]
 
                     if selected_waifu["favorite"] == 1:
-                        return await message.reply(embed=makeEmbed("Remove Blocked", f"Selected character is a favorite.\nIf you want to remove them from favorites, use ``{PREFIX}unfav [inventory slot]``"))
+                        return await message.reply(embed=makeEmbed("Remove Blocked", f"""``{selected_waifu["index"]}`` **{selected_waifu["en_name"]}** is a favorite.\nIf you want to remove them from favorites, use ``{PREFIX}unfav [inventory slot]``"""))
 
-                    description = f"""You are about to remove {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
+                    description = f"""You are about to remove ``{selected_waifu["index"]}`` {makeRarityString(selected_waifu["rarity"])} **{selected_waifu["en_name"]}** #{selected_waifu["image_index"]}
 Removing this waifu will award you **{db.getRarityCurrency(selected_waifu["rarity"])}** {CURRENCY}.
 If you agree with this removal, respond with ``yes``.
 Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
@@ -511,13 +511,13 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                         else:
                             true_remove.append(waifu)
                         total_value += db.getRarityCurrency(waifu["rarity"])
-                        description += f"""{makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}\n"""
+                        description += f"""``{waifu["index"]}`` {makeRarityString(waifu["rarity"])} **{waifu["en_name"]}** #{waifu["image_index"]}\n"""
                     description += f"""Removing these **{len(selected_waifus)}** waifus will award you **{total_value}** {CURRENCY}.\n"""
 
                     if favorites:
                         description += "\nIgnored favorites (won't be removed):\n"
                         for favorite in favorites:
-                            description += f"""{makeRarityString(favorite["rarity"])} **{favorite["en_name"]}** #{favorite["image_index"]}{" :heart:" if waifu["favorite"] == 1 else ""}\n\n"""
+                            description += f"""``{favorite["index"]}`` {makeRarityString(favorite["rarity"])} **{favorite["en_name"]}** #{favorite["image_index"]}{" :heart:" if waifu["favorite"] == 1 else ""}\n\n"""
 
                     description += f"""If you agree with this removal, respond with ``yes``.
 Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the removal."""
@@ -692,7 +692,7 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
                 db.addWaifu(guess.author.id, character_data["image_id"], character_data["rarity"])
-                random_bonus = round(numpyrand.uniform(25, 301))
+                random_bonus = round(numpyrand.uniform(10, 125))
                 db.addUserCurrency(guess.author.id, random_bonus)
                 embed = makeEmbed("Waifu Claimed!",
                                   f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{len(db.getWaifus(guess.author.id, unpaginated=True))}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")

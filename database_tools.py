@@ -300,21 +300,7 @@ def divideWaifus(waifus_list, chunk_size):
 def getWaifus(user_id, rarity=None, name_query=None, show_id=None, page_size=25, unpaginated=False, inventory_index=None):
     ensureUserExists(user_id)
     conn, cursor = getConnection()
-
-    if show_id:
-        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite, sc.show_id
-FROM waifus
-LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
-FROM character c
-LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
-ON w.character_id = c.id) s
-ON waifus.images_id = s.id
-LEFT JOIN show_character sc
-ON sc.char_id = s.char_id
-WHERE waifus.user_id = ? AND sc.show_id = ?
-ORDER BY waifus.id;""", (user_id, show_id))
-    else:
-        cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
+    cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
 FROM waifus
 LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
 FROM character c
@@ -324,7 +310,6 @@ ON waifus.images_id = s.id
 WHERE waifus.user_id = ?
 ORDER BY waifus.id;""", (user_id,))
     rows = cursor.fetchall()
-    conn.close()
     waifus = []
     final_pages = []
     index = 0
@@ -348,13 +333,19 @@ ORDER BY waifus.id;""", (user_id,))
                      "favorite": row[7]}
 
         if show_id:
-            cur_waifu["show_id"] = row[8]
+            if int(show_id) in getShowsFromCharacter(cur_waifu["char_id"]):
+                cur_waifu["show_id"] = show_id
+            else:
+                continue
 
         if inventory_index and index == inventory_index:
+            conn.close()
             return [cur_waifu]
 
         if not inventory_index:
             waifus.append(cur_waifu)
+
+    conn.close()
 
     if waifus:
         if unpaginated:
@@ -732,3 +723,22 @@ def unFavorite(waifus_id):
 
     conn.commit()
     conn.close()
+
+
+def getShowsFromCharacter(char_id, connection=None):
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
+
+    show_list = []
+
+    cursor.execute("""SELECT DISTINCT show_id FROM show_character WHERE char_id = ?""", (char_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        show_list.append(int(row[0]))
+
+    if not connection:
+        conn.close()
+
+    return show_list
