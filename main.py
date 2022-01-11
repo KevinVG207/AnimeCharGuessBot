@@ -462,10 +462,6 @@ async def on_message(message):
                         return await message.channel.send(embed=makeEmbed("Trade Failed",
                                                                           "Something went wrong. The trade has been cancelled."))
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
-            else:
-                if not message.content.startswith(f"{PREFIX}trade cancel"):
-                    return await message.reply(
-                    embed=makeEmbed("Command failed.", "You are already in an active trade."))
 
         elif message.content == f"{PREFIX}remove" or message.content.startswith(f"{PREFIX}remove ") or \
                 message.content == f"{PREFIX}yeet" or message.content.startswith(f"{PREFIX}yeet "):
