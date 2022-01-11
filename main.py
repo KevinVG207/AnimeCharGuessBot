@@ -727,7 +727,7 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 random_bonus = round(numpyrand.uniform(10, 125))
                 db.addUserCurrency(guess.author.id, random_bonus)
                 embed = makeEmbed("Waifu Claimed!",
-                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{len(db.getWaifus(guess.author.id, unpaginated=True))}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")
+                                  f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{db.getWaifusAmount(guess.author.id)}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")
                 embed.set_image(url=character_data["image_url"])
                 return await guess.reply(embed=embed)
 

@@ -794,3 +794,15 @@ def getShowsFromCharacter(char_id, connection=None):
         conn.close()
 
     return show_list
+
+
+def getWaifusAmount(user_id):
+
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT COUNT(*) FROM waifus WHERE user_id = ?;""", (user_id,))
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return rows[0][0]
