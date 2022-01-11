@@ -1,11 +1,14 @@
+import os.path
 import random
 import sqlite3
 import name_tools as nt
 from numpy import random as numpyrand
 
-DATABASE_URI = "database/database.db"
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+DATABASE_URI = WORKING_DIR + "/database/database.db"
 
 DAILY_CURRENCY = 500
+
 
 def getConnection():
     conn = sqlite3.connect(DATABASE_URI)
