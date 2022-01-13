@@ -3,6 +3,8 @@
 import collections
 import datetime
 import random
+import time
+
 import discord
 import logging
 import bot_token
@@ -150,7 +152,7 @@ async def on_message(message):
                 embed_description = f"View a character's detail page.\nUsage: ``{PREFIX}view [character ID]``"
             elif specific_command == "daily":
                 embed_title = f"Help for {PREFIX}daily"
-                embed_description = f"Claim your daily credits.\nResets after midnight CET/CEST."
+                embed_description = f"Claim your daily credits.\nResets after <t:{generateNextMidnight()}:t>."
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -707,7 +709,7 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 db.addDailyCurrency(user_id)
                 return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}! See you again tomorrow.\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})"))
             else:
-                return await message.reply(embed=makeEmbed(f"Already Claimed", f"You've already claimed your daily {CURRENCY}.\nYou will be able to claim again after midnight CET/CEST."))
+                return await message.reply(embed=makeEmbed(f"Already Claimed", f"You've already claimed your daily {CURRENCY}.\nYou will be able to claim again <t:{generateNextMidnight()}:R>."))
 
     # Drops!
     if message.guild and not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
@@ -1053,6 +1055,12 @@ def makeCharacterInfoEmbed(waifu_info, cur_image):
     embed.set_image(url=waifu_info["image_urls"][cur_image])
 
     return embed
+
+
+def generateNextMidnight():
+    midnight = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    next_midnight = midnight + datetime.timedelta(days=1)
+    return round(time.mktime(next_midnight.timetuple()))
 
 
 client.run(bot_token.getToken())
