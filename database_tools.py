@@ -1,3 +1,4 @@
+import datetime
 import os.path
 import random
 import sqlite3
@@ -308,7 +309,7 @@ def ensureUserExists(user_id):
     rows = cursor.fetchall()
     if not rows:
         # User does not exist
-        cursor.execute("""INSERT INTO user (id) VALUES (?);""", (user_id,))
+        cursor.execute("""INSERT INTO user (id, last_daily) VALUES (?,?);""", (user_id, datetime.datetime.now()))
         conn.commit()
     conn.close()
 
@@ -752,14 +753,13 @@ def getRarityCurrency(rarity):
     return round(exchange_rates[rarity])
 
 
-def addDailyCurrency():
+def addDailyCurrency(user_id):
+    ensureUserExists(user_id)
+    addUserCurrency(user_id, DAILY_CURRENCY)
     conn, cursor = getConnection()
-
-    cursor.execute("""SELECT id FROM user;""")
-    rows = cursor.fetchall()
+    cursor.execute("""UPDATE user SET last_daily = ? WHERE id = ?;""", (datetime.datetime.now(), user_id))
+    conn.commit()
     conn.close()
-    for row in rows:
-        addUserCurrency(row[0], DAILY_CURRENCY)
 
 
 def setFavorite(waifus_id):
@@ -853,3 +853,18 @@ def getCharacterInfo(char_id):
         "image_urls": image_urls,
         "favorites": favs_count
     }
+
+
+def userCanDaily(user_id):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+
+    date_format = "%d-%m-%Y %H:%M:%S"
+    cursor.execute("""SELECT STRFTIME(?, last_daily) FROM user WHERE id = ?;""", (date_format, user_id))
+    row = cursor.fetchone()
+    conn.close()
+    last_datetime = datetime.datetime.strptime(row[0], date_format)
+    if last_datetime.date() < datetime.datetime.today().date():
+        return True
+    return False
+

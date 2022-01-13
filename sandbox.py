@@ -1,8 +1,14 @@
+import datetime
+
 import mal_tools as mal
 import database_tools as db
 
-for show in db.getCharactersFromShow(59):
-    print(show)
+conn, cursor = db.getConnection()
+
+cursor.execute("""UPDATE user SET last_daily = '2022-01-12 19:56:00.096531' WHERE id = 167670846507319297;""")
+
+conn.commit()
+conn.close()
 quit()
 
 mal.downloadInsertShowCharacters("")
@@ -11,6 +17,22 @@ mal.downloadInsertShowCharacters("https://myanimelist.net/manga/7519/Kami_nomi_z
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/123450/Saikin_Yatotta_Maid_ga_Ayashii")
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/138079/Genshin_Comic_Anthology")
 
+
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/22147/Amagi_Brilliant_Park")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/10721/Mawaru_Penguindrum")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/16732/Kiniro_Mosaic")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/10495/Yuru_Yuri")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/36259/Pingu_in_the_City")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/37430/Tensei_shitara_Slime_Datta_Ken")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/39551/Tensei_shitara_Slime_Datta_Ken_2nd_Season")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/10165/Nichijou")
+mal.downloadInsertShowCharacters("https://myanimelist.net/manga/3446/Maker_Hikoushiki_Hatsune_Mix")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/43299/Wonder_Egg_Priority")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/33489/Little_Witch_Academia_TV")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/6594/Katanagatari")
+mal.downloadInsertShowCharacters("https://myanimelist.net/manga/34053/Umineko_no_Naku_Koro_ni_Chiru_-_Episode_8__Twilight_of_the_Golden_Witch")
+mal.downloadInsertShowCharacters("https://myanimelist.net/manga/16144/Umineko_no_Naku_Koro_ni_-_Episode_4__Alliance_of_the_Golden_Witch")
+mal.downloadInsertShowCharacters("http://www.myanimelist.net/anime/33674/No_Game_No_Life__Zero")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/13601/Psycho-Pass")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/2966/Ookami_to_Koushinryou")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/5341/Ookami_to_Koushinryou_II")

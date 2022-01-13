@@ -99,7 +99,8 @@ async def on_message(message):
                 "wager": f"Wager {CURRENCY} and have 50% chance to double it.",
                 "fav": "Favorite a waifu.",
                 "unfav": "Unfavorite a waifu.",
-                "view": "View details of a character including stats."
+                "view": "View details of a character including stats.",
+                "daily": "Claim daily credits."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -147,6 +148,9 @@ async def on_message(message):
             elif specific_command == "view":
                 embed_title = f"Help for {PREFIX}view"
                 embed_description = f"View a character's detail page.\nUsage: ``{PREFIX}view [character ID]``"
+            elif specific_command == "daily":
+                embed_title = f"Help for {PREFIX}daily"
+                embed_description = f"Claim your daily credits.\nResets after midnight CET/CEST."
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -696,6 +700,15 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 return await message.reply(embed=makeEmbed("404 Waifu Not Found", "No character exists with this ID."))
             return await showCharacterInfoEmbed(waifu_info, message)
 
+        elif message.content == f"{PREFIX}daily":
+            print("hello")
+            user_id = message.author.id
+            if db.userCanDaily(user_id):
+                db.addDailyCurrency(user_id)
+                return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}! See you again tomorrow.\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})"))
+            else:
+                return await message.reply(embed=makeEmbed(f"Already Claimed", f"You've already claimed your daily {CURRENCY}.\nYou will be able to claim again after midnight CET/CEST."))
+
     # Drops!
     if message.guild and not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
         if numpyrand.random() < calcDropChance(message.guild.member_count):
@@ -744,7 +757,6 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                                   f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{db.getWaifusAmount(guess.author.id)}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")
                 embed.set_image(url=character_data["image_url"])
                 return await guess.reply(embed=embed)
-
     return
 
 
