@@ -11,10 +11,11 @@ import database_tools as db
 import name_tools as nt
 from numpy import random as numpyrand
 
+CHARACTER_TIMEOUT = 30.0
 CURRENCY = "credits"
 DROP_CHANCE = 0.1
 EMBED_COLOR = discord.Color.red()
-DROP_TIMEOUT = 5 * 60.0  # 3600.0
+DROP_TIMEOUT = 10 * 60.0  # 3600.0
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w." if not bot_token.isDebug() else bot_token.getPrefix()
@@ -65,8 +66,6 @@ async def on_message(message):
     TODO: Add -s [show_id] to w.waifus
     TODO: Add lots of characters!
     TODO: Pagination for w.show with more than 25 characters.
-    TODO: Character detail page (add ID to w.show) with name(s), image(s) (maybe using pagination),
-          amount claimed, unique users.
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
     """
@@ -93,13 +92,14 @@ async def on_message(message):
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
                 "trade": "Start a trade offer with another user.",
-                "view": "View one of your collected waifus in more detail.",
+                "waifu": "View one of your collected waifus in more detail.",
                 "remove": "Let one or more of your waifus go.",
                 "profile": "View your (or someone else's) profile.",
                 "roll": f"Perform a gacha roll. (Default: 100 {CURRENCY})",
                 "wager": f"Wager {CURRENCY} and have 50% chance to double it.",
                 "fav": "Favorite a waifu.",
-                "unfav": "Unfavorite a waifu."
+                "unfav": "Unfavorite a waifu.",
+                "view": "View details of a character including stats."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -115,7 +115,7 @@ async def on_message(message):
                 embed_title = f"Help for {PREFIX}waifus"
                 embed_description = f"View your collected waifus inventory.\nUsage: ``{PREFIX}waifus [user ping or ID] -u [user ping or ID] -r [rarity number] -p [page number] -n [part of name (MUST BE FINAL ARGUMENT cuz I'm lazy)]``"
             elif specific_command == "view":
-                embed_title = f"Help for {PREFIX}view"
+                embed_title = f"Help for {PREFIX}waifu"
                 embed_description = f"View a collected waifu in more detail.\nUsage: ``{PREFIX}view [inventory number] -u [user ping or ID]``"
             elif specific_command == "search":
                 embed_title = f"Help for {PREFIX}search"
@@ -144,6 +144,9 @@ async def on_message(message):
             elif specific_command == "unfav":
                 embed_title = f"Help for {PREFIX}unfav"
                 embed_description = f"Unfavorites a waifu from your inventory.\nUsage: ``{PREFIX}unfav [inventory slot]``"
+            elif specific_command == "view":
+                embed_title = f"Help for {PREFIX}view"
+                embed_description = f"View a character's detail page.\nUsage: ``{PREFIX}view [character ID]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -205,6 +208,9 @@ async def on_message(message):
                         if cur_arg.startswith("-"):
                             if args:
                                 user_arg = args.pop(0)
+                            else:
+                                return await message.channel.send(embed=makeEmbed("Waifus Lookup Failed",
+                                                                                  "Did not mention a user."))
                         else:
                             user_arg = cur_arg
                         if user_arg.startswith("<@"):
@@ -226,27 +232,29 @@ async def on_message(message):
                                                                               "Requested user is not in this server."))
             return await showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, name_query, show_id)
 
-        elif message.content == f"{PREFIX}view" or message.content.startswith(f"{PREFIX}view "):
-            args = getMessageArgs("view", message)
+        elif message.content == f"{PREFIX}waifu" or message.content.startswith(f"{PREFIX}waifu "):
+            args = getMessageArgs("waifu", message)
             user_id = message.author.id
             user_name = message.author.display_name
             inventory_index = 0
             # Arguments
             if not args:
                 return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                  f"Usage: ``{PREFIX}view [number] (optional: -u @ping/user_id)``"))
+                                                                  f"Usage: ``{PREFIX}waifu [number] (optional: -u @ping/user_id)``"))
             else:
                 inventory_arg = args.pop(0)
                 if not inventory_arg.isnumeric():
                     return await message.channel.send(embed=makeEmbed("Command failed.",
-                                                                      f"Usage: ``{PREFIX}view [number]``"))
+                                                                      f"Usage: ``{PREFIX}waifu [number]``"))
                 inventory_index = int(inventory_arg)
                 while len(args) > 0:
                     cur_arg = args.pop(0)
                     if cur_arg == "-u":
                         if args:
                             user_arg = args.pop(0)
-
+                        else:
+                            return await message.channel.send(embed=makeEmbed("Command failed.",
+                                                                              f"Usage: ``{PREFIX}waifu [number]``"))
                         if not message.guild:
                             return await message.reply(
                                 embed=makeEmbed("User Lookup Failed", "You cannot look for users in DMs."))
@@ -678,6 +686,16 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
             else:
                 return await message.reply(embed=makeEmbed("You Lose!", f"Too bad, you lost your wager.\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (-{wager})"))
 
+        elif message.content == f"{PREFIX}view" or message.content.startswith(f"{PREFIX}view "):
+            args = getMessageArgs("view", message)
+            if not args or (args and not args[0].isnumeric()):
+                return await message.reply(embed=makeEmbed("Character Lookup Failed", f"Usage: ``{PREFIX}view [character ID]``"))
+            char_id = int(args[0])
+            waifu_info = db.getCharacterInfo(char_id)
+            if not waifu_info:
+                return await message.reply(embed=makeEmbed("404 Waifu Not Found", "No character exists with this ID."))
+            return await showCharacterInfoEmbed(waifu_info, message)
+
     # Drops!
     if message.guild and not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
         if numpyrand.random() < calcDropChance(message.guild.member_count):
@@ -715,12 +733,12 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
                 except asyncio.TimeoutError:
                     db.enableDrops(guild_id)
                     embed = makeEmbed("Timed Out!",
-                                      f"""**{character_data["en_name"]}** gave up waiting.\nBetter luck next time!""")
+                                      f"""**{character_data["en_name"]}** gave up waiting.\nBetter luck next time!\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})""")
                     embed.set_image(url=character_data["image_url"])
                     return await assigned_channel.send(embed=embed)
                 db.enableDrops(guild_id)
                 db.addWaifu(guess.author.id, character_data["image_id"], character_data["rarity"])
-                random_bonus = round(numpyrand.uniform(10, 125))
+                random_bonus = round(numpyrand.uniform(50, 125))
                 db.addUserCurrency(guess.author.id, random_bonus)
                 embed = makeEmbed("Waifu Claimed!",
                                   f"""**{guess.author.display_name}** is correct!\nYou've claimed **{character_data["en_name"]}**.\n{makeRarityString(character_data["rarity"])}\n[MyAnimeList](https://myanimelist.net/character/{character_data["char_id"]})\nThey have filled inventory slot ``{db.getWaifusAmount(guess.author.id)}``.\nYour {CURRENCY}: **{db.getUserCurrency(guess.author.id)}** (+{random_bonus})""")
@@ -799,8 +817,8 @@ async def showNormalWaifusPage(message, user_id, user_name, cur_page, rarity, na
         embed, total_pages, cur_page = getWaifuPageEmbed(user_id, user_name, cur_page, rarity, name_query, show_id)
         if total_pages < 0:
             return await message.channel.send(embed=embed)
-        await own_message.edit(embed=embed)
         if message.guild:
+            await own_message.edit(embed=embed)
             await own_message.remove_reaction(reaction, user)
         else:
             # Workaround because you cannot remove another user's reactions in a DM channel.
@@ -964,6 +982,64 @@ Your {CURRENCY}: **{db.getUserCurrency(user.id)}** (-{price})"""
 
     embed = makeEmbed(title, descr)
     embed.set_image(url=rolled_waifu["image_url"])
+    return embed
+
+
+async def showCharacterInfoEmbed(waifu_info, message):
+    cur_image = 0
+    total_images = len(waifu_info["image_urls"])
+    own_message = await message.channel.send(embed=makeCharacterInfoEmbed(waifu_info, cur_image))
+    await own_message.add_reaction(NAV_LEFT_EMOJI)
+    await own_message.add_reaction(NAV_RIGHT_EMOJI)
+
+    def isValidNavigation(r, u):
+        if u != client.user and r.message.id == own_message.id and u.id == message.author.id:
+            if r.emoji in NAV_EMOJI:
+                return True
+        return False
+
+    while True:
+        try:
+            reaction, user = await client.wait_for("reaction_add", check=isValidNavigation, timeout=CHARACTER_TIMEOUT)
+        except asyncio.TimeoutError:
+            break
+        # Reaction received, edit message.
+        new_image = cur_image + NAV_EMOJI[reaction.emoji]
+
+        if new_image < 0:
+            new_image = total_images - 1
+        elif new_image + 1 > total_images:
+            new_image = 0
+
+        cur_image = new_image
+        if message.guild:
+            await own_message.edit(embed=makeCharacterInfoEmbed(waifu_info, cur_image))
+            await own_message.remove_reaction(reaction, user)
+        else:
+            # Workaround because you cannot remove another user's reactions in a DM channel.
+            own_message = await message.channel.send(embed=makeCharacterInfoEmbed(waifu_info, cur_image))
+            await own_message.add_reaction(NAV_LEFT_EMOJI)
+            await own_message.add_reaction(NAV_RIGHT_EMOJI)
+    return
+
+
+def makeCharacterInfoEmbed(waifu_info, cur_image):
+
+    title = waifu_info["en_name"]
+    descr = ""
+    if waifu_info["jp_name"]:
+        descr += f"""{waifu_info["jp_name"]}\n"""
+    descr += f"""[{waifu_info["char_id"]}](https://myanimelist.net/character/{waifu_info["char_id"]})\n"""
+    descr += f"""**{len(waifu_info["image_urls"])}** images\n"""
+    descr += f"""Favorited **{waifu_info["favorites"]}** time{'' if waifu_info["favorites"] == 1 else 's'}\n"""
+    descr += f"""\nNumber collected: **{waifu_info["waifu_count"]}**\n"""
+    for i in range(0, 6):
+        descr += f"""{makeRarityString(i)}: {waifu_info["rarity_count"][i] if i in waifu_info["rarity_count"] else 0}\n"""
+
+    embed = makeEmbed(title, descr)
+    embed.set_footer(text=f"""Image #{cur_image + 1} of {len(waifu_info["image_urls"])}""")
+    embed.set_image(url=waifu_info["image_urls"][cur_image])
+
     return embed
 
 

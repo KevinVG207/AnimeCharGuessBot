@@ -809,3 +809,47 @@ def getWaifusAmount(user_id):
     conn.close()
 
     return rows[0][0]
+
+
+def getCharacterInfo(char_id):
+    if not characterExists(char_id):
+        return None
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT en_name, jp_name FROM character WHERE id = ?;""", (char_id,))
+    row = cursor.fetchone()
+    en_name = row[0]
+    jp_name = row[1]
+
+    cursor.execute("""SELECT url FROM images WHERE character_id = ?;""", (char_id,))
+    rows = cursor.fetchall()
+    image_urls = []
+    for row in rows:
+        image_urls.append(row[0])
+
+    cursor.execute("""SELECT rarity, favorite FROM waifus w INNER JOIN (SELECT id FROM images WHERE character_id = ?) i ON i.id = w.images_id;""", (char_id,))
+    rows = cursor.fetchall()
+    waifu_count = len(rows)
+    rarity_count = {}
+    favs_count = 0
+    for row in rows:
+        cur_rarity = row[0]
+        cur_fav = row[1]
+        if cur_fav == 1:
+            favs_count += 1
+        if cur_rarity not in rarity_count:
+            rarity_count[cur_rarity] = 1
+        else:
+            rarity_count[cur_rarity] += 1
+
+    conn.close()
+
+    return {
+        "char_id": char_id,
+        "en_name": en_name,
+        "jp_name": jp_name,
+        "waifu_count": waifu_count,
+        "rarity_count": rarity_count,
+        "image_urls": image_urls,
+        "favorites": favs_count
+    }
