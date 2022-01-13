@@ -707,7 +707,7 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
             user_id = message.author.id
             if db.userCanDaily(user_id):
                 db.addDailyCurrency(user_id)
-                return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}! See you again tomorrow.\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})"))
+                return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}!\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})\nYou can claim again again <t:{generateNextMidnight()}:R>."))
             else:
                 return await message.reply(embed=makeEmbed(f"Already Claimed", f"You've already claimed your daily {CURRENCY}.\nYou will be able to claim again <t:{generateNextMidnight()}:R>."))
 
