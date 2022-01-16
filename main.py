@@ -16,8 +16,9 @@ from numpy import random as numpyrand
 CHARACTER_TIMEOUT = 30.0
 CURRENCY = "credits"
 DROP_CHANCE = 0.1
-EMBED_COLOR = discord.Color.red()
 DROP_TIMEOUT = 10 * 60.0  # 3600.0
+EMBED_COLOR = discord.Color.red()
+GIFT_TIMEOUT = 15
 PROFILE_TIMEOUT = 30.0
 PROFILE_PAGE_SIZE = 25
 PREFIX = "w." if not bot_token.isDebug() else bot_token.getPrefix()
@@ -86,10 +87,10 @@ async def on_message(message):
         if not args:
             # Simple help
             help_commands = {
-                "help": f"Show this help message. Use {PREFIX}help [command] to get help for a specific command.",
+                "help": f"Show this help message. Use ``{PREFIX}help [command]`` to get help for a specific command.",
                 "ping": "Pong.",
                 "waifus": "View your collected waifus.",
-                "list": f"Alias of {PREFIX}waifus.",
+                "list": f"Alias of ``{PREFIX}waifus``.",
                 "search": "Find a show.",
                 "show": "View characters of a show.",
                 "assign": "Assign bot to a channel. The bot will drop waifus here. Most commands only work in the assigned channel. (Only for members with the Manage Channels permission.)",
@@ -102,7 +103,9 @@ async def on_message(message):
                 "fav": "Favorite a waifu.",
                 "unfav": "Unfavorite a waifu.",
                 "view": "View details of a character including stats.",
-                "daily": "Claim daily credits."
+                "daily": f"Claim daily {CURRENCY}.",
+                "give": f"Alias of ``{PREFIX}gift``.",
+                "gift": f"Give a user {CURRENCY}."
             }
             commands_sorted = sorted(help_commands.keys())
             help_lines = []
@@ -128,7 +131,7 @@ async def on_message(message):
                 embed_description = f"Displays the characters of a show that the bot has.\nUsage: ``{PREFIX}show [show id]``"
             elif specific_command == "trade":
                 embed_title = f"Help for {PREFIX}trade"
-                embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
+                embed_description = f"Start a trade offer or modify/confirm an existing trade offer.\nUsages:\n``{PREFIX}trade [user]``\n``{PREFIX}trade add [inventory number]``\n``{PREFIX}trade remove [inventory number]``\n``{PREFIX}trade {CURRENCY} [amount] (use 0 to cancel)``\n``{PREFIX}trade confirm``\n``{PREFIX}trade cancel``"
             elif specific_command == "remove":
                 embed_title = f"Help for {PREFIX}remove"
                 embed_description = f"Let one of your waifus go. This will reward you {CURRENCY} depending on the rarity of the waifu.\n(1/4 of {CURRENCY} needed to roll that same rarity.)\nUsages:\n``{PREFIX}remove [inventory number]``\n``{PREFIX}remove -s [show id]``"
@@ -140,7 +143,7 @@ async def on_message(message):
                 embed_description = f"""Perform a gacha roll with optional infusion of {CURRENCY}.\n(Default: 100, maximum: 15000)\nPrices for guaranteed rarities:\n``★★☆☆☆: 300``\n``★★★☆☆: 1000``\n``★★★★☆: 5000``\n``★★★★★: 15000``\nUsage: ``{PREFIX}roll [{CURRENCY}]``"""
             elif specific_command == "wager":
                 embed_title = f"Help for {PREFIX}wager"
-                embed_description = f"Wager credits with a 50% chance of doubling them. (Or losing them :P)\nUsage: ``{PREFIX}wager [amount]``"
+                embed_description = f"Wager {CURRENCY} with a 50% chance of doubling them. (Or losing them :P)\nUsage: ``{PREFIX}wager [amount]``"
             elif specific_command == "fav":
                 embed_title = f"Help for {PREFIX}fav"
                 embed_description = f"Favorites a waifu from your inventory.\nUsage: ``{PREFIX}fav [inventory slot]``"
@@ -152,7 +155,10 @@ async def on_message(message):
                 embed_description = f"View a character's detail page.\nUsage: ``{PREFIX}view [character ID]``"
             elif specific_command == "daily":
                 embed_title = f"Help for {PREFIX}daily"
-                embed_description = f"Claim your daily credits.\nResets after <t:{generateNextMidnight()}:t>."
+                embed_description = f"Claim your daily {CURRENCY}.\nResets after <t:{generateNextMidnight()}:t>."
+            elif specific_command == "give" or specific_command == "gift":
+                embed_title = f"Help for {PREFIX}gift"
+                embed_description = f"Gift some of your {CURRENCY} to someone else.\nUsage: ``{PREFIX}gift @user [amount]``"
             return await message.channel.send(embed=makeEmbed(embed_title, embed_description))
 
     # Assign bot to channel.
@@ -324,6 +330,7 @@ async def on_message(message):
                 user1 = message.author
                 user1_confirm = False
                 user1_offer = []
+                user1_currency = 0
 
                 if not message.guild:
                     return await message.reply(
@@ -337,6 +344,7 @@ async def on_message(message):
 
                 user2_confirm = False
                 user2_offer = []
+                user2_currency = 0
                 cancel = False
                 timeout = False
 
@@ -368,7 +376,7 @@ async def on_message(message):
                         else:
                             # Normal state change
                             await message.channel.send(
-                                embed=makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_confirm))
+                                embed=makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_currency, user2_currency, user1_confirm, user2_confirm))
                     else:
                         # No state change
                         pass
@@ -394,18 +402,18 @@ async def on_message(message):
                                 user2_confirm = True
                         elif m.content.startswith(f"{PREFIX}trade add"):
                             if not m.content.startswith(f"{PREFIX}trade add "):
-                                await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                await m.reply(embed=makeEmbed("Trade add failed.",
                                                                      f"Usage: ``{PREFIX}trade add [inventory number]``"))
                             else:
                                 to_be_added = m.content.split(" ", 2)[2]
                                 if not to_be_added.isnumeric():
-                                    await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                    await m.reply(embed=makeEmbed("Trade add failed.",
                                                                          f"Usage: ``{PREFIX}trade add [inventory number]``"))
                                 else:
                                     to_be_added = int(to_be_added)
                                     current_waifus = db.getWaifus(m.author.id, unpaginated=True)
                                     if to_be_added > len(current_waifus):
-                                        await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                        await m.reply(embed=makeEmbed("Trade add failed.",
                                                                              f"Waifu not found in user's inventory."))
                                     else:
                                         if m.author.id == user1.id:
@@ -414,7 +422,7 @@ async def on_message(message):
                                             for waifu in user1_offer:
                                                 if waifu["waifus_id"] == new_waifu["waifus_id"]:
                                                     dupe = True
-                                                    await m.channel.send(embed=makeEmbed("Trade add failed.", "Selected waifu already in offer."))
+                                                    await m.reply(embed=makeEmbed("Trade add failed.", "Selected waifu already in offer."))
                                             if not dupe:
                                                 user1_offer.append(new_waifu)
                                                 change = True
@@ -424,19 +432,19 @@ async def on_message(message):
                                             for waifu in user2_offer:
                                                 if waifu["waifus_id"] == new_waifu["waifus_id"]:
                                                     dupe = True
-                                                    await m.channel.send(embed=makeEmbed("Trade add failed.",
+                                                    await m.reply(embed=makeEmbed("Trade add failed.",
                                                                                          "Selected waifu already in offer."))
                                             if not dupe:
                                                 user2_offer.append(new_waifu)
                                                 change = True
                         elif m.content.startswith(f"{PREFIX}trade remove"):
                             if not m.content.startswith(f"{PREFIX}trade remove "):
-                                await m.channel.send(embed=makeEmbed("Trade remove failed.",
+                                await m.reply(embed=makeEmbed("Trade remove failed.",
                                                                      f"Usage: ``{PREFIX}trade remove [inventory number]``"))
                             else:
                                 to_be_removed = m.content.split(" ", 2)[2]
                                 if not to_be_removed.isnumeric():
-                                    await m.channel.send(embed=makeEmbed("Trade remove failed.",
+                                    await m.reply(embed=makeEmbed("Trade remove failed.",
                                                                          f"Usage: ``{PREFIX}trade remove [inventory number]``"))
                                 else:
                                     to_be_removed = int(to_be_removed)
@@ -457,9 +465,34 @@ async def on_message(message):
                                                 new_offer.append(waifu)
                                         user2_offer = new_offer
                                     if not removed:
-                                        await m.channel.send(embed=makeEmbed("Trade remove failed.", "Waifu not found in trade offer."))
+                                        await m.reply(embed=makeEmbed("Trade remove failed.", "Waifu not found in trade offer."))
                                     else:
                                         change = True
+                        elif m.content.startswith(f"{PREFIX}trade {CURRENCY}"):
+                            if not m.content.startswith(f"{PREFIX}trade {CURRENCY} "):
+                                await m.reply(embed=makeEmbed(f"Adding {CURRENCY} failed.",
+                                                                     f"Usage: ``{PREFIX}trade {CURRENCY} [amount]``"))
+                            else:
+                                amount = m.content.split(" ", 2)[2]
+                                if not amount.isnumeric():
+                                    await m.reply(embed=makeEmbed(f"Adding {CURRENCY} failed.",
+                                                                     f"Usage: ``{PREFIX}trade {CURRENCY} [amount]``"))
+                                else:
+                                    amount = int(amount)
+                                    if m.author.id == user1.id:
+                                        tmp_user_id = user1.id
+                                    else:
+                                        tmp_user_id = user2.id
+                                    if amount > db.getUserCurrency(tmp_user_id):
+                                        await m.reply(embed=makeEmbed(f"Adding {CURRENCY} failed.",
+                                                                      f"You do not have enough {CURRENCY}."))
+                                    else:
+                                        change = True
+                                        if m.author.id == user1.id:
+                                            user1_currency = amount
+                                        else:
+                                            user2_currency = amount
+
                     except asyncio.TimeoutError:
                         timeout = True
                         break
@@ -472,7 +505,7 @@ async def on_message(message):
                 elif timeout:
                     return await message.channel.send(embed=makeEmbed("Trade Cancelled", "Trade has timed out."))
                 else:
-                    if not db.trade(user1.id, user2.id, user1_offer, user2_offer):
+                    if not db.trade(user1.id, user2.id, user1_offer, user2_offer, user1_currency, user2_currency):
                         return await message.channel.send(embed=makeEmbed("Trade Failed",
                                                                           "Something went wrong. The trade has been cancelled."))
                     return await message.channel.send(embed=makeEmbed("Trade Succeeded", "Trade has been confirmed!"))
@@ -684,7 +717,8 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
             current_user_currency = db.getUserCurrency(user_id)
             if current_user_currency < wager:
                 return await message.reply(embed=makeEmbed("Wager Failed", f"You don't have enough {CURRENCY}. Currently: **{current_user_currency}**"))
-            db.subtractUserCurrency(user_id, wager)
+            if not db.subtractUserCurrency(user_id, wager):
+                return await message.reply(embed=makeEmbed("Wager Failed", f"Something went wrong. You did not gain/lose any {CURRENCY}."))
             win = numpyrand.choice((True, False))
             if win:
                 db.addUserCurrency(user_id, wager * 2)
@@ -707,9 +741,69 @@ Respond with anything else or wait {REMOVAL_TIMEOUT} seconds to cancel the remov
             user_id = message.author.id
             if db.userCanDaily(user_id):
                 db.addDailyCurrency(user_id)
-                return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}!\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})\nYou can claim again again <t:{generateNextMidnight()}:R>."))
+                return await message.reply(embed=makeEmbed(f"Daily {CURRENCY.capitalize()} Received", f"You received {db.DAILY_CURRENCY} {CURRENCY}!\nYour {CURRENCY}: **{db.getUserCurrency(user_id)}** (+{db.DAILY_CURRENCY})\nYou can claim again <t:{generateNextMidnight()}:R>."))
             else:
                 return await message.reply(embed=makeEmbed(f"Already Claimed", f"You've already claimed your daily {CURRENCY}.\nYou will be able to claim again <t:{generateNextMidnight()}:R>."))
+
+        elif message.content == f"{PREFIX}give" or message.content.startswith(f"{PREFIX}give ") or \
+                message.content == f"{PREFIX}gift" or message.content.startswith(f"{PREFIX}gift "):
+            if message.content.startswith(f"{PREFIX}give"):
+                args = getMessageArgs("give", message)
+            else:
+                args = getMessageArgs("gift", message)
+            failed_embed = makeEmbed("Command Failed", f"Usage: ``{PREFIX}gift @user [amount]``")
+            if not args or len(args) != 2:
+                return await message.reply(embed=failed_embed)
+            # Find out which is the ping
+            if isMention(args[0]):
+                mention_arg = args[0]
+                amount_arg = args[1]
+            else:
+                mention_arg = args[1]
+                amount_arg = args[0]
+
+            recipient = await getUserInGuild(mention_arg, message.guild)
+            if not recipient:
+                return await message.reply(embed=makeEmbed("Command Failed", f"Recipient not found in server."))
+            if recipient.id == message.author.id:
+                return await message.reply(embed=makeEmbed("Command Failed", f"Why are you trying to give {CURRENCY} to yourself? Baka."))
+            if not amount_arg.isnumeric() or int(amount_arg) < 1:
+                return await message.reply(embed=failed_embed)
+            amount = int(amount_arg)
+            sender_currency = db.getUserCurrency(message.author.id)
+            if amount > sender_currency:
+                return await message.reply(embed=makeEmbed("Command Failed", f"You do not have enough {CURRENCY}.\nYour {CURRENCY}: **{sender_currency}**"))
+
+            confirmation_embed = makeEmbed("Gift Confirmation", f"You are about to send **{amount}** {CURRENCY} to **{recipient.display_name}**.\nIf you agree with this transaction, send ``yes`` in this channel.\nSending anything else or waiting {GIFT_TIMEOUT} seconds will cancel this transaction.")
+            confirmation_embed.set_thumbnail(url=getUserAvatarURL(recipient, 128))
+            await message.reply(embed=confirmation_embed)
+
+            def userIsOriginalUser(m):
+                if m.author.id == message.author.id:
+                    return True
+                return False
+
+            confirm_message = None
+            try:
+                confirm_message = await client.wait_for("message", check=userIsOriginalUser, timeout=GIFT_TIMEOUT)
+            except asyncio.TimeoutError:
+                pass
+
+            if not confirm_message or not confirm_message.content.lower() == "yes":
+                embed = makeEmbed("Gift Cancelled", "Your gift has been cancelled.")
+                if not confirm_message:
+                    return await message.reply(embed=embed)
+                return await confirm_message.reply(embed=embed)
+
+            # Gift confirmed
+            if not db.subtractUserCurrency(message.author.id, amount):
+                return await message.reply(embed=makeEmbed("Gift Cancelled", f"Something went wrong.\nThe transaction is cancelled."))
+            db.addUserCurrency(recipient.id, amount)
+            embed = makeEmbed("Gift Successful", f"You have given **{amount}** {CURRENCY} to **{recipient.display_name}**.\nYour {CURRENCY}: **{db.getUserCurrency(message.author.id)}** (-{amount})")
+            embed.set_thumbnail(url=getUserAvatarURL(recipient, 128))
+            return await confirm_message.reply(embed=embed)
+
+
 
     # Drops!
     if message.guild and not message.content.startswith(f"{PREFIX}") and db.canDrop(message.guild.id):
@@ -922,7 +1016,7 @@ async def getUserInGuild(requested_user, guild):
     :param guild: Guild Object - The guild to search the user in.
     :return: User Object
     """
-    if requested_user.startswith("<@"):
+    if isMention(requested_user):
         # It's a ping
         user_id = pingToID(requested_user)
     else:
@@ -937,26 +1031,30 @@ async def getUserInGuild(requested_user, guild):
         return None
 
 
-def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_confirm, user2_confirm):
+def makeTradeEmbed(user1, user2, user1_offer, user2_offer, user1_currency, user2_currency, user1_confirm, user2_confirm):
     description = ""
 
     description += f"**{user1.display_name}**'s offer:\n"
-    if not user1_offer:
+    if not user1_offer and user1_currency == 0:
         description += "``Empty``\n"
     else:
+        if user1_currency > 0:
+            description += f"""{CURRENCY.capitalize()}: **{user1_currency}**\n"""
         for waifu in user1_offer:
             description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{makeRarityString(waifu["rarity"])} #{waifu["image_index"]}\n"""
     description += f"""{":white_check_mark: Confirmed" if user1_confirm else ":x: Unconfirmed"}\n"""
 
     description += f"\n**{user2.display_name}**'s offer:\n"
-    if not user2_offer:
+    if not user2_offer and user2_currency == 0:
         description += "``Empty``\n"
     else:
+        if user2_currency > 0:
+            description += f"""{CURRENCY.capitalize()}: **{user2_currency}**\n"""
         for waifu in user2_offer:
             description += f"""{waifu["index"]} | {waifu["char_id"]} **{waifu["en_name"]}** R:{makeRarityString(waifu["rarity"])} #{waifu["image_index"]}\n"""
     description += f"""{":white_check_mark: Confirmed" if user2_confirm else ":x: Unconfirmed"}\n"""
 
-    description += f"""\nAdd waifus using ``{PREFIX}trade add [inventory number]``\nConfirm trade using ``{PREFIX}trade confirm``"""
+    description += f"""\nAdd waifus with ``{PREFIX}trade add [inventory number]``\nConfirm trade with ``{PREFIX}trade confirm``\nCancel trade with ``{PREFIX}trade cancel``\nFor more features, check ``{PREFIX}help trade``"""
 
     embed = makeEmbed("Waifu Trade Offer", description)
     return embed
@@ -982,7 +1080,7 @@ def makeProfileEmbed(user):
     descr = f"""{CURRENCY.capitalize()}: {db.getUserCurrency(user.id)}"""
 
     embed = makeEmbed(title, descr)
-    embed.set_thumbnail(url=user.avatar_url)
+    embed.set_thumbnail(url=getUserAvatarURL(user, 128))
     return embed
 
 
@@ -1061,6 +1159,14 @@ def generateNextMidnight():
     midnight = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     next_midnight = midnight + datetime.timedelta(days=1)
     return round(time.mktime(next_midnight.timetuple()))
+
+
+def isMention(argument):
+    return argument.startswith("<@") and argument.endswith(">")
+
+
+def getUserAvatarURL(user, resolution):
+    return f"{user.avatar_url}?size={resolution}"
 
 
 client.run(bot_token.getToken())

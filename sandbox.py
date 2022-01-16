@@ -3,12 +3,7 @@ import datetime
 import mal_tools as mal
 import database_tools as db
 
-conn, cursor = db.getConnection()
-
-cursor.execute("""UPDATE user SET last_daily = '2022-01-12 19:56:00.096531' WHERE id = 167670846507319297;""")
-
-conn.commit()
-conn.close()
+db.removeUselessWaifus()
 quit()
 
 mal.downloadInsertShowCharacters("")

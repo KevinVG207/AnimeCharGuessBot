@@ -303,15 +303,19 @@ def enableAllRemoves():
     conn.close()
 
 
-def ensureUserExists(user_id):
-    conn, cursor = getConnection()
+def ensureUserExists(user_id, connection=None):
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
     cursor.execute("""SELECT id FROM user WHERE id = ?;""", (user_id,))
     rows = cursor.fetchall()
     if not rows:
         # User does not exist
         cursor.execute("""INSERT INTO user (id, last_daily) VALUES (?,?);""", (user_id, datetime.datetime.now()))
         conn.commit()
-    conn.close()
+    if not connection:
+        conn.close()
 
 
 def addWaifu(user_id, image_id, rarity, connection=None):
@@ -652,8 +656,26 @@ def generateRaritiesForUnsetWaifus():
     return
 
 
-def trade(user1_id, user2_id, user1_offer, user2_offer):
+def trade(user1_id, user2_id, user1_offer, user2_offer, user1_currency, user2_currency):
     conn, cursor = getConnection()
+
+    # First, check if users have enough currency.
+    # Then, remove/add currency
+    if user1_currency > 0:
+        cursor.execute("""SELECT currency FROM user WHERE id = ?;""", (user1_id,))
+        row = cursor.fetchone()
+        if row[0] < user1_currency or not subtractUserCurrency(user1_id, user1_currency, (conn, cursor)):
+            conn.close()
+            return False
+        addUserCurrency(user2_id, user1_currency, (conn, cursor))
+
+    if user2_currency > 0:
+        cursor.execute("""SELECT currency FROM user WHERE id = ?;""", (user2_id,))
+        row = cursor.fetchone()
+        if row[0] < user2_currency or not subtractUserCurrency(user2_id, user2_currency, (conn, cursor)):
+            conn.close()
+            return False
+        addUserCurrency(user1_id, user2_currency, (conn, cursor))
 
     # Start by deleting existing waifus, ensuring they exist. Then insert waifu for other user.
     for waifu in user1_offer:
@@ -723,22 +745,38 @@ def getUserCurrency(user_id):
     return rows[0][0]
 
 
-def addUserCurrency(user_id, amount):
-    conn, cursor = getConnection()
+def addUserCurrency(user_id, amount, connection=None):
+    ensureUserExists(user_id, connection)
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
     cursor.execute("""UPDATE user SET currency = currency + ? WHERE id = ?;""", (amount, user_id))
     conn.commit()
-    conn.close()
+    if not connection:
+        conn.close()
     print(f"Added {amount} to {user_id}")
     return
 
 
-def subtractUserCurrency(user_id, amount):
-    conn, cursor = getConnection()
+def subtractUserCurrency(user_id, amount, connection=None):
+    ensureUserExists(user_id, connection)
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
+    cursor.execute("""SELECT currency FROM user WHERE id = ?;""", (user_id,))
+    row = cursor.fetchone()
+    if row[0] < amount:
+        if not connection:
+            conn.close()
+        return False
     cursor.execute("""UPDATE user SET currency = currency - ? WHERE id = ?;""", (amount, user_id))
-    print(f"Subtracted {amount} from {user_id}")
     conn.commit()
-    conn.close()
-    return
+    if not connection:
+        conn.close()
+    print(f"Subtracted {amount} from {user_id}")
+    return True
 
 
 def getRarityCurrency(rarity):
