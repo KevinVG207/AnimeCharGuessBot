@@ -3,8 +3,10 @@ import datetime
 import mal_tools as mal
 import database_tools as db
 
-db.removeUselessWaifus()
+
 quit()
+
+db.removeUselessWaifus()
 
 mal.downloadInsertShowCharacters("")
 

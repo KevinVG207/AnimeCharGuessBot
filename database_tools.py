@@ -459,16 +459,17 @@ LEFT JOIN images i ON waifus.images_id = i.id
 LEFT JOIN character c ON i.character_id = c.id
 WHERE user_id = ?
 LIMIT ?, 1;""", (user_id, skip))
-    rows = cursor.fetchall()
+    row = cursor.fetchone()
     conn.close()
-    if not rows:
+    if not row:
         return None
-    return {"en_name": rows[0][0],
-            "jp_name": rows[0][1],
-            "id": rows[0][2],
-            "image_url": rows[0][3],
-            "image_index": getWaifuImageIndex(rows[0][4]),
-            "rarity": rows[0][5]}
+    return {"en_name": row[0],
+            "jp_name": row[1],
+            "id": row[2],
+            "image_url": row[3],
+            "image_index": getWaifuImageIndex(row[4]),
+            "rarity": row[5],
+            "waifus_id": row[4]}
 
 
 def insertShow(mal_id, jp_title, en_title, is_manga):
@@ -737,12 +738,12 @@ def getUserCurrency(user_id):
     conn, cursor = getConnection()
 
     cursor.execute("""SELECT currency FROM user WHERE id = ?;""", (user_id,))
-    rows = cursor.fetchall()
+    row = cursor.fetchone()
 
     conn.commit()
     conn.close()
 
-    return rows[0][0]
+    return row[0]
 
 
 def addUserCurrency(user_id, amount, connection=None):
@@ -755,7 +756,7 @@ def addUserCurrency(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Added {amount} to {user_id}")
+    print(f"Added {amount} currency to {user_id}")
     return
 
 
@@ -775,7 +776,7 @@ def subtractUserCurrency(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Subtracted {amount} from {user_id}")
+    print(f"Subtracted {amount} currency from {user_id}")
     return True
 
 
@@ -798,6 +799,53 @@ def addDailyCurrency(user_id):
     cursor.execute("""UPDATE user SET last_daily = ? WHERE id = ?;""", (datetime.datetime.now(), user_id))
     conn.commit()
     conn.close()
+
+
+def getUserUpgrades(user_id):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+
+    cursor.execute("""SELECT upgrades FROM user WHERE id = ?;""", (user_id,))
+    row = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    return row[0]
+
+
+def addUserUpgrades(user_id, amount, connection=None):
+    ensureUserExists(user_id, connection)
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
+    cursor.execute("""UPDATE user SET upgrades = upgrades + ? WHERE id = ?;""", (amount, user_id))
+    conn.commit()
+    if not connection:
+        conn.close()
+    print(f"Added {amount} upgrades to {user_id}")
+    return
+
+
+def subtractUserUpgrades(user_id, amount, connection=None):
+    ensureUserExists(user_id, connection)
+    if connection:
+        conn, cursor = connection
+    else:
+        conn, cursor = getConnection()
+    cursor.execute("""SELECT upgrades FROM user WHERE id = ?;""", (user_id,))
+    row = cursor.fetchone()
+    if row[0] < amount:
+        if not connection:
+            conn.close()
+        return False
+    cursor.execute("""UPDATE user SET upgrades = upgrades - ? WHERE id = ?;""", (amount, user_id))
+    conn.commit()
+    if not connection:
+        conn.close()
+    print(f"Subtracted {amount} upgrades from {user_id}")
+    return True
 
 
 def setFavorite(waifus_id):
@@ -906,3 +954,19 @@ def userCanDaily(user_id):
         return True
     return False
 
+
+def upgradeUserWaifu(user_id, waifus_id, amount):
+    ensureUserExists(user_id)
+    conn, cursor = getConnection()
+
+    # Remove upgrades
+    if not subtractUserUpgrades(user_id, amount, (conn, cursor)):
+        conn.close()
+        return False
+
+    # Upgrade waifu
+    cursor.execute("""UPDATE waifus SET rarity = rarity + 1 WHERE id = ?;""", (waifus_id,))
+
+    conn.commit()
+    conn.close()
+    return True
