@@ -3,6 +3,9 @@ venv/
 venv2/
 __pycache__/
 database/
+bin/
+lib/
+pyvenv.cfg
 
 bot_token.py
 discord.log
