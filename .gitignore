@@ -2,7 +2,8 @@
 venv/
 venv2/
 __pycache__/
-database/
+database/*
+!database/create.sql
 
 bot_token.py
 discord.log
