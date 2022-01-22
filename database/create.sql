@@ -1,5 +1,5 @@
 -- Created by Vertabelo (http://vertabelo.com)
--- Last modification date: 2022-01-18 12:45:57.953
+-- Last modification date: 2022-01-22 21:44:43.038
 
 -- tables
 -- Table: character
@@ -36,7 +36,7 @@ CREATE TABLE show (
     mal_id integer NOT NULL,
     is_manga boolean NOT NULL DEFAULT 0,
     jp_title text NOT NULL,
-    en_title text NOT NULL
+    en_title text
 );
 
 -- Table: show_character
