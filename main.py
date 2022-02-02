@@ -82,7 +82,7 @@ async def on_message(message):
     TODO: Add update functions for character and images in database.
     MAYBE: w.skip to skip drop *based* on the amount of online members.
     """
-    if message.author == client.user:
+    if message.author == client.user or message.author.bot:
         return
 
     # I wonder if this causes issues elsewhere. The whole bot becomes case insensitive.
