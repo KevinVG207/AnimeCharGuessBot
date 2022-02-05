@@ -80,8 +80,8 @@ class AnimeCharGuessBot(discord.Client):
         '''
 
         # Ignore messages from bots, including this one.
-        #if message.author.bot:
-        #    return
+        if message.author.bot:
+            return
 
         # Makes the bot completely case insensitive.
         message_content = message.content.lower()
