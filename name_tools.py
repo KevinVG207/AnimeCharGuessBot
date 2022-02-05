@@ -35,7 +35,7 @@ def normalize_romanization(text):
 
 def unordered_normalized(text):
     '''
-    Returns objectd that will be equal if the entered name is the same when normalized and the order is ignored.
+    Returns objects that will be equal over multiple calls if the entered name is the same when normalized and the order is ignored.
     '''
 
     if text is None:
