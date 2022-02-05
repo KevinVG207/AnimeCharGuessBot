@@ -60,10 +60,10 @@ def downloadInsertShowCharacters(show_url, overwrite=False):
             jp_title = jp_title_element.contents[0]
             en_title = jp_title_element.find("span", class_="title-english").text
 
-    if not db.showExistsByMAL(mal_id, is_manga):
-        db.insertShow(mal_id, jp_title, en_title, is_manga)
+    if not db.show_exists_by_mal(mal_id, is_manga):
+        db.insert_show(mal_id, jp_title, en_title, is_manga)
 
-    show_id = db.getShowIDByMAL(mal_id, is_manga)
+    show_id = db.get_show_id_by_mal(mal_id, is_manga)
 
     if not is_manga:
         character_tables = soup.find_all("table", class_="js-anime-character-table")
@@ -78,16 +78,16 @@ def downloadInsertShowCharacters(show_url, overwrite=False):
         character_id = getCharacterIDFromURL(character_url["href"])
         if not overwrite:
             # Check if already exists and ignore if so.
-            if db.characterExists(character_id):
-                if db.characterHasShow(character_id, show_id):
+            if db.character_exists(character_id):
+                if db.character_has_show(character_id, show_id):
                     print(f"Character {character_id} already exists.")
                     continue
                 else:
                     # Add show to character.
-                    db.addShowToCharacter(character_id, show_id)
+                    db.add_show_to_character(character_id, show_id)
                     continue
-        db.insertCharacter(downloadCharacterFromURL(character_url["href"]))
-        db.addShowToCharacter(character_id, show_id)
+        db.insert_character(downloadCharacterFromURL(character_url["href"]))
+        db.add_show_to_character(character_id, show_id)
 
 
 def getCharacterIDFromURL(character_url):
@@ -100,7 +100,7 @@ def downloadCharacterFromURL(character_url):
 
 def downloadCharacter(char_id):
     print(f"Downloading character {char_id}", end=" ")
-    time.sleep(2)
+    time.sleep(20)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")
