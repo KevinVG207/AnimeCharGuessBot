@@ -87,11 +87,13 @@ async def page(bot, args, waifus, title, page_no = None):
 
         button_queue = asyncio.Queue()
 
-        async def prev_cb(_):
-            await button_queue.put(-1)
+        async def prev_cb(interaction):
+            if interaction.user.id == args.user.id:
+                await button_queue.put(-1)
 
-        async def next_cb(_):
-            await button_queue.put(1)
+        async def next_cb(interaction):
+            if interaction.user.id == args.user.id:
+                await button_queue.put(1)
 
         prev_button.callback = prev_cb
         next_button.callback = next_cb
