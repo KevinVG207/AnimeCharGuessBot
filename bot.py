@@ -122,7 +122,7 @@ class AnimeCharGuessBot(discord.Client):
             # Not a command, but we are in a guild, so we might want to drop or check if a drop guess is correct.
             drop = self.active_drops.get(message.guild.id)
 
-            if drop and message.channel.id == db.get_assigned_channel_id(message.guild.id) and drop.guess_matches(message_content):
+            if isinstance(drop, Drop) and message.channel.id == db.get_assigned_channel_id(message.guild.id) and drop.guess_matches(message_content):
                 # A drop is currently running, and the message was a correct guess, so reward the guesser.
                 del self.active_drops[message.guild.id]
                 await self.give_drop(drop, message)
@@ -262,7 +262,7 @@ class AnimeCharGuessBot(discord.Client):
 
         await asyncio.sleep(constants.DROP_TIMEOUT)
 
-        if self.active_drops[guild.id] is drop:
+        if self.active_drops.get(guild.id) is drop:
             # After timeout, this is still the active drop, so cancel it and reveal the answer.
             del self.active_drops[guild.id]
             await channel.send(embed = drop.create_timeout_embed())
