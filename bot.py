@@ -392,9 +392,37 @@ class AnimeCharGuessBot(discord.Client):
 
         else:
             await args.message.reply(embed = display.create_embed(
-                f'Already Claimed',
+                'Already Claimed',
                 f"You've already claimed your daily {self.currency}.\n"
                 f'You will be able to claim again {daily_reset}.'
+            ))
+
+
+    @command('drop')
+    async def command_drop(self, args):
+        '''
+        See what the current random drop is.
+        '''
+
+        if args.arguments_string:
+            return cmd.BAD_USAGE
+        
+        if not args.guild:
+            await args.message.reply(embed = display.create_embed(
+                'No Drop',
+                'Drops are not available in DMs.'
+            ))
+            return
+
+        drop = self.active_drops.get(args.guild.id)
+
+        if isinstance(drop, Drop):
+            await args.message.reply(embed = drop.create_guess_embed())
+
+        else:
+            await args.message.reply(embed = display.create_embed(
+                'No Drop',
+                'There is not currently a drop running.'
             ))
 
 
