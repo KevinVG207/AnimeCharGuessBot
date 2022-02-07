@@ -122,7 +122,7 @@ class AnimeCharGuessBot(discord.Client):
             # Not a command, but we are in a guild, so we might want to drop or check if a drop guess is correct.
             drop = self.active_drops.get(message.guild.id)
 
-            if drop and message.channel.id == db.get_assigned_channel_id(message.guild.id) and drop.guess_matches(message_content):
+            if isinstance(drop, Drop) and message.channel.id == db.get_assigned_channel_id(message.guild.id) and drop.guess_matches(message_content):
                 # A drop is currently running, and the message was a correct guess, so reward the guesser.
                 del self.active_drops[message.guild.id]
                 await self.give_drop(drop, message)
@@ -262,7 +262,7 @@ class AnimeCharGuessBot(discord.Client):
 
         await asyncio.sleep(constants.DROP_TIMEOUT)
 
-        if self.active_drops[guild.id] is drop:
+        if self.active_drops.get(guild.id) is drop:
             # After timeout, this is still the active drop, so cancel it and reveal the answer.
             del self.active_drops[guild.id]
             await channel.send(embed = drop.create_timeout_embed())
@@ -392,9 +392,37 @@ class AnimeCharGuessBot(discord.Client):
 
         else:
             await args.message.reply(embed = display.create_embed(
-                f'Already Claimed',
+                'Already Claimed',
                 f"You've already claimed your daily {self.currency}.\n"
                 f'You will be able to claim again {daily_reset}.'
+            ))
+
+
+    @command('drop')
+    async def command_drop(self, args):
+        '''
+        See what the current random drop is.
+        '''
+
+        if args.arguments_string:
+            return cmd.BAD_USAGE
+        
+        if not args.guild:
+            await args.message.reply(embed = display.create_embed(
+                'No Drop',
+                'Drops are not available in DMs.'
+            ))
+            return
+
+        drop = self.active_drops.get(args.guild.id)
+
+        if isinstance(drop, Drop):
+            await args.message.reply(embed = drop.create_guess_embed())
+
+        else:
+            await args.message.reply(embed = display.create_embed(
+                'No Drop',
+                'There is not currently a drop running.'
             ))
 
 

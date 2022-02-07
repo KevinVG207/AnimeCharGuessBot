@@ -12,7 +12,11 @@ async def verify_image(url):
     Check if an image actually exists on the remote server.
     '''
 
-    resp = await http.request('head', url)
+    try:
+        resp = await http.request('head', url)
+    
+    except Exception:
+        return False
 
     return resp.status_code == 200
 
@@ -36,7 +40,7 @@ class Drop:
             return cls(waifu, channel)
 
         else:
-            return cls.create(channel)
+            return await cls.create(channel)
 
 
     def __init__(self, waifu, channel):
