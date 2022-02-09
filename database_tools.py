@@ -2,6 +2,8 @@ import datetime
 import os.path
 import random
 import sqlite3
+
+import constants
 import name_tools as nt
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -667,7 +669,11 @@ def get_history(guild_id):
         return [int(hist_element) for hist_element in rows[0][0].split(";")]
 
 
-def update_history(guild_id, history):
+def update_history(guild_id, history, waifu_data):
+    if len(history) > constants.HISTORY_SIZE:
+        history = history[-constants.HISTORY_SIZE:]
+    history.pop(0)
+    history.append(waifu_data["id"])
     history_joined = ";".join([str(hist_element) for hist_element in history])
     conn, cursor = get_connection()
     cursor.execute("""UPDATE guild SET history = ? WHERE id = ?""", (history_joined, guild_id))

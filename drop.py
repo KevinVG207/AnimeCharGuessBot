@@ -37,6 +37,7 @@ class Drop:
         waifu = Waifu.from_data(data)
 
         if await verify_image(waifu.image_url):
+            db.update_history(channel.guild.id, history, data)
             return cls(waifu, channel)
 
         else:

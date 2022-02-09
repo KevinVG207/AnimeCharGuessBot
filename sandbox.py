@@ -4,6 +4,10 @@ import mal_tools as mal
 import database_tools as db
 
 
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/33573/BanG_Dream")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48753/Jahy-sama_wa_Kujikenai")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48556/Takt_Op_Destiny")
+
 quit()
 
 db.removeUselessWaifus()

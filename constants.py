@@ -1,6 +1,7 @@
 import discord
 
 # Constants used by the bot in various places.
+import bot_token
 
 ENVVAR_PREFIX = 'ACGB_'
 
@@ -11,7 +12,7 @@ EMBED_COLOR = discord.Color.red()
 GIFT_TIMEOUT = 15
 PROFILE_TIMEOUT = 30
 PROFILE_PAGE_SIZE = 25
-PREFIX = "w."
+PREFIX = "w." if not bot_token.isDebug() else "ww."
 REMOVAL_TIMEOUT = 15
 TRADE_TIMEOUT = 60
 UPGRADE_TIMEOUT = 15
