@@ -176,7 +176,18 @@ class Waifu:
         if card_index is not None:
             card_index += 1
 
-        return cls(Character.from_data(data), data.get('image_index'), data.get('image_url'), data.get('rarity'), data.get('image_id'), user, card_index, data.get('waifus_id'), data.get('favorite'))
+        return cls(Character.from_data(data),
+                   data.get('image_index'),
+                   data.get('image_url'),
+                   data.get('rarity'),
+                   data.get('image_id'),
+                   user,
+                   card_index,
+                   data.get('waifus_id'),
+                   data.get('favorite'),
+                   data.get('normal_url'),
+                   data.get('mirror_url'),
+                   data.get('flipped_url'))
 
 
     @classmethod

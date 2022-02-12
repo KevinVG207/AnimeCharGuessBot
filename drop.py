@@ -32,7 +32,6 @@ class Drop:
         """
         Create a new random drop.
         """
-
         history = db.get_history(channel.guild.id)
         data = db.get_drop_data(history)
         waifu = Waifu.from_data(data)

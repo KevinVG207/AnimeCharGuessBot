@@ -4,6 +4,7 @@ import os.path
 import random
 import sqlite3
 
+import bot_token
 import constants
 import mal_tools
 import name_tools as nt
@@ -188,17 +189,27 @@ def can_remove(user_id):
 def get_drop_data(history=None, price=None, user_id=None):
     conn, cursor = get_connection()
     if history:
-        cursor.execute(
-            f"""SELECT DISTINCT id FROM character WHERE droppable = 1 AND id NOT IN ({",".join(["?" for _ in history])});""",
-            tuple(history))
+        if bot_token.isDebug():
+            cursor.execute(
+                f"""SELECT DISTINCT c.id FROM character c JOIN images i on c.id = i.character_id WHERE c.droppable = 1 AND i.normal_url IS NOT NULL AND c.id NOT IN ({",".join(["?" for _ in history])});""",
+                tuple(history))
+        else:
+            cursor.execute(
+                f"""SELECT DISTINCT id FROM character WHERE droppable = 1 AND id NOT IN ({",".join(["?" for _ in history])});""",
+                tuple(history))
     else:
         cursor.execute("""SELECT DISTINCT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
 
     char_id = random.choice(rows)[0]
-    cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
-    LEFT JOIN images ON character.id = images.character_id
-    WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
+    if bot_token.isDebug():
+        cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
+LEFT JOIN images ON character.id = images.character_id
+WHERE images.droppable = 1 AND normal_url IS NOT NULL AND character.id = ?;""", (char_id,))
+    else:
+        cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
+LEFT JOIN images ON character.id = images.character_id
+WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     rows2 = cursor.fetchall()
 
     conn.close()
