@@ -17,8 +17,8 @@ intents = discord.Intents().all()
 
 token = os.environ[f'{constants.ENVVAR_PREFIX}TOKEN']
 
-resource_server = os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_SERVER']
-resource_channel = os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_CHANNEL']
+resource_server = int(os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_SERVER'])
+resource_channel = int(os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_CHANNEL'])
 
 admins = [
     admin_id.strip()

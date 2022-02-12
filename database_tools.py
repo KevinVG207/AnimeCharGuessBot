@@ -1,9 +1,11 @@
+import asyncio
 import datetime
 import os.path
 import random
 import sqlite3
 
 import constants
+import mal_tools
 import name_tools as nt
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -1050,3 +1052,18 @@ def upgrade_user_waifu(user_id, waifus_id, amount):
     conn.commit()
     conn.close()
     return True
+
+async def update_images():
+    conn, cursor = get_connection()
+    cursor.execute("""SELECT id, url FROM images WHERE normal_url IS NULL;""")
+    rows = cursor.fetchall()
+    for row in rows:
+        cur_id = row[0]
+        print(f"Updating images for character: {cur_id}")
+        mal_url = row[1]
+        images_obj = await mal_tools.CharacterImage.create(mal_url)
+        cursor.execute("""UPDATE images SET normal_url = ?, mirror_url = ?, flipped_url = ? WHERE id = ?;""", (images_obj.normal_url, images_obj.mirror_url, images_obj.upside_down_url, cur_id))
+        await asyncio.sleep(20)
+
+    conn.commit()
+    conn.close()

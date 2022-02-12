@@ -1,5 +1,6 @@
 import asyncio
 import os
+import random
 
 import requests
 from bs4 import BeautifulSoup
@@ -8,6 +9,67 @@ from PIL import Image, ImageOps
 
 import constants
 import database_tools as db
+
+
+class CharacterImage:
+
+    @classmethod
+    async def create(cls, mal_url):
+        tmp_file_name = random.randint(1, 99999999999999999999)
+        if not os.path.exists(constants.TMP_DIR):
+            os.mkdir(constants.TMP_DIR)
+
+        normal_path = constants.TMP_DIR + "/norm_" + tmp_file_name
+        mirror_path = constants.TMP_DIR + "/mirr_" + tmp_file_name
+        upside_down_path = constants.TMP_DIR + "/flip_" + tmp_file_name
+
+        image_response = requests.get(mal_url)
+        with open(normal_path, 'wb') as f:
+            f.write(image_response.content)
+
+        # Flip and mirror the image
+        normal_image = Image.open(normal_path)
+        mirror_image = ImageOps.mirror(normal_image)
+        mirror_image.save(mirror_path, quality=90)
+        upside_down_image = ImageOps.flip(normal_image)
+        upside_down_image.save(upside_down_path, quality=90)
+
+        new_image_urls = await constants.BOT_OBJECT.send_character_images(normal_path, mirror_path, upside_down_path)
+
+        os.remove(normal_path)
+        os.remove(mirror_path)
+        os.remove(upside_down_path)
+
+        return cls(new_image_urls[0], new_image_urls[1], new_image_urls[2])
+
+    def __init__(self, normal_url, mirror_url, upside_down_url):
+        self.normal_url = normal_url
+        self.mirror_url = mirror_url
+        self.upside_down_url = upside_down_url
+
+
+class ShowQueue:
+    def __init__(self):
+        self.running = False
+        self.show_queue = []
+
+    def has_next(self):
+        return bool(self.show_queue)
+
+
+    def __len__(self):
+        return len(self.show_queue)
+
+
+    def get_url(self):
+        if self.show_queue:
+            return self.show_queue.pop(0)
+        else:
+            return None
+
+
+    def add_url(self, url):
+        self.show_queue.append(url)
 
 
 def getShowURLSegment(show_url):
@@ -91,7 +153,9 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
                     # Add show to character.
                     db.add_show_to_character(character_id, show_id)
                     continue
-        db.insert_character(await downloadCharacterFromURL(character_url["href"]))
+        character_data = await downloadCharacterFromURL(character_url["href"])
+        quit()
+        db.insert_character(character_data)
         db.add_show_to_character(character_id, show_id)
 
     await asyncio.sleep(20)
@@ -128,15 +192,15 @@ async def downloadCharacter(char_id):
         if link["href"].endswith("/pics"):
             image_page_url = link["href"]
 
-    image_urls = await getImageURLs(image_page_url)
+    image_objects = await getImages(image_page_url)
 
     return {"char_id": char_id,
             "en_name": en_name.strip(),
             "jp_name": jp_name.strip() if jp_name else jp_name,
-            "image_urls": image_urls}
+            "image_urls": image_objects}
 
 
-async def getImageURLs(image_page_url):
+async def getImages(image_page_url):
     await asyncio.sleep(2)
     image_page = requests.get(image_page_url)
     img_soup = BeautifulSoup(image_page.content, "html.parser")
@@ -148,64 +212,9 @@ async def getImageURLs(image_page_url):
             image_urls.append(image["href"])
 
     # Remove duplicates
-    return list(dict.fromkeys(image_urls))
+    image_urls = list(dict.fromkeys(image_urls))
 
-
-class CharacterImage:
-
-    @classmethod
-    async def create(cls, mal_url):
-        tmp_file_name = mal_url.rsplit("/", 1)[1]
-        if not os.path.exists(constants.TMP_DIR):
-            os.mkdir(constants.TMP_DIR)
-
-        normal_path = constants.TMP_DIR + "/norm_" + tmp_file_name
-        mirror_path = constants.TMP_DIR + "/mirr_" + tmp_file_name
-        upside_down_path = constants.TMP_DIR + "/flip_" + tmp_file_name
-
-        image_response = requests.get(mal_url)
-        with open(normal_path, 'wb') as f:
-            f.write(image_response.content)
-
-        # Flip and mirror the image
-        normal_image = Image.open(normal_path)
-        mirror_image = ImageOps.mirror(normal_image)
-        mirror_image.save(mirror_path, quality=90)
-        upside_down_image = ImageOps.flip(normal_image)
-        upside_down_image.save(upside_down_path, quality=90)
-
-
-
-        return cls(normal_url, mirror_url, upside_down_url)
-
-    def __init__(self, normal_url, mirror_url, upside_down_url):
-        self.normal_url = normal_url
-        self.mirror_url = mirror_url
-        self.upside_down_url = upside_down_url
-
-
-class ShowQueue:
-    def __init__(self):
-        self.running = False
-        self.show_queue = []
-
-    def has_next(self):
-        return bool(self.show_queue)
-
-
-    def __len__(self):
-        return len(self.show_queue)
-
-
-    def get_url(self):
-        if self.show_queue:
-            return self.show_queue.pop(0)
-        else:
-            return None
-
-
-    def add_url(self, url):
-        self.show_queue.append(url)
+    return [await CharacterImage.create(image_url) for image_url in image_urls]
 
 
 async def run_queue(show_queue: ShowQueue):

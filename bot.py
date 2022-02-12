@@ -313,6 +313,11 @@ class AnimeCharGuessBot(discord.Client):
         """
         Sends images to the resource channel and returns the image URLs.
         """
+        files = (discord.File(fp=normal_path),
+                 discord.File(fp=mirror_path),
+                 discord.File(fp=upside_down_path))
+        message = await self.resource_channel.send(files=files)
+        return [attachment.url for attachment in message.attachments]
 
 
     @command('a.drop', require_bot_admin = True)
@@ -382,9 +387,13 @@ class AnimeCharGuessBot(discord.Client):
 
         if not self.show_queue.running:
             self.show_queue.running = True
-            await mal_tools.run_queue(self)
+            await mal_tools.run_queue(self.show_queue)
 
         return
+
+    @command('a.makeimages', require_bot_admin=True)
+    async def command_admin_makeimages(self, args):
+        await db.update_images()
 
 
     @command('assign', require_server_admin = True, only_in_assigned_channel = False)
