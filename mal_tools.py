@@ -31,12 +31,14 @@ class CharacterImage:
 
         # Flip and mirror the image
         normal_image = Image.open(normal_path)
-        bg_layer = Image.new("RGB", normal_image.size, (255, 255, 255))
-        bg_layer.paste(normal_image, mask=normal_image.split()[3])
-        bg_layer.save(normal_path, "JPEG", quality=90)
-        mirror_image = ImageOps.mirror(bg_layer)
+        if normal_image.mode == "RGBA":
+            bg_layer = Image.new("RGB", normal_image.size, (255, 255, 255))
+            bg_layer.paste(normal_image, mask=normal_image.split()[3])
+            bg_layer.save(normal_path, "JPEG", quality=90)
+            normal_image = bg_layer
+        mirror_image = ImageOps.mirror(normal_image)
         mirror_image.save(mirror_path, "JPEG", quality=90)
-        upside_down_image = ImageOps.flip(bg_layer)
+        upside_down_image = ImageOps.flip(normal_image)
         upside_down_image.save(upside_down_path, "JPEG", quality=90)
 
         new_image_urls = await constants.BOT_OBJECT.send_character_images(normal_path, mirror_path, upside_down_path)
