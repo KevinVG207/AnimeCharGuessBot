@@ -193,7 +193,7 @@ class Waifu:
         return cls.from_data(data, user)
 
 
-    def __init__(self, character, image, image_url, rarity, image_id = None, owner = None, index = None, waifu_id = None, fav = None):
+    def __init__(self, character, image, image_url, rarity, image_id = None, owner = None, index = None, waifu_id = None, fav = None, normal_url = None, mirror_url = None, flipped_url = None):
         self.character = character
         self.image = image
         self.image_url = image_url
@@ -202,6 +202,9 @@ class Waifu:
         self.owner = owner
         self.index = index
         self.waifu_id = waifu_id
+        self.normal_url = normal_url
+        self.mirror_url = mirror_url
+        self.flipped_url = flipped_url
 
         # `fav` might be some other truthy or falsy value, like 0 or 1
         if fav is not None:

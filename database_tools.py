@@ -194,24 +194,9 @@ def get_drop_data(history=None, price=None, user_id=None):
     else:
         cursor.execute("""SELECT DISTINCT id FROM character WHERE droppable = 1;""")
     rows = cursor.fetchall()
-    # true_rows = []
 
-    # if history:
-    #     for row in rows:
-    #         if int(row[0]) not in history:
-    #             true_rows.append(row)
-    #         else:
-    #             print(row[0])
-    # else:
-    #     true_rows = rows
-
-    # Doing this for Jack's paranoia.
-    # random.seed()
-    # random_number = random.randint(0, len(rows))
-    # random.shuffle(true_rows)
-    
     char_id = random.choice(rows)[0]
-    cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name FROM character
+    cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
     LEFT JOIN images ON character.id = images.character_id
     WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     rows2 = cursor.fetchall()
@@ -224,6 +209,9 @@ def get_drop_data(history=None, price=None, user_id=None):
     alt_name = rows2[0][2]
     jp_name = rows2[0][4]
     image_id = rows2[0][3]
+    normal_url = rows2[0][5]
+    mirror_url = rows2[0][6]
+    flipped_url = rows2[0][7]
     rarity, price = generate_rarity(price)
 
     cur_waifu = {"id": char_id,
@@ -232,7 +220,10 @@ def get_drop_data(history=None, price=None, user_id=None):
                  "jp_name": jp_name,
                  "alt_name": alt_name,
                  "image_id": image_id,
-                 "rarity": rarity}
+                 "rarity": rarity,
+                 "normal_url": normal_url,
+                 "mirror_url": mirror_url,
+                 "flipped_url": flipped_url}
 
     if price and user_id:
         # We are rolling.
@@ -1055,14 +1046,16 @@ def upgrade_user_waifu(user_id, waifus_id, amount):
 
 async def update_images():
     conn, cursor = get_connection()
-    cursor.execute("""SELECT id, url FROM images WHERE normal_url IS NULL;""")
+    cursor.execute("""SELECT id, url, character_id FROM images WHERE normal_url IS NULL;""")
     rows = cursor.fetchall()
     for row in rows:
         cur_id = row[0]
-        print(f"Updating images for character: {cur_id}")
+        print(f"Updating image {cur_id}, character: {row[2]}")
         mal_url = row[1]
         images_obj = await mal_tools.CharacterImage.create(mal_url)
-        cursor.execute("""UPDATE images SET normal_url = ?, mirror_url = ?, flipped_url = ? WHERE id = ?;""", (images_obj.normal_url, images_obj.mirror_url, images_obj.upside_down_url, cur_id))
+        if images_obj:
+            cursor.execute("""UPDATE images SET normal_url = ?, mirror_url = ?, flipped_url = ? WHERE id = ?;""", (images_obj.normal_url, images_obj.mirror_url, images_obj.upside_down_url, cur_id))
+            conn.commit()
         await asyncio.sleep(20)
 
     conn.commit()

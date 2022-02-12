@@ -15,7 +15,7 @@ class CharacterImage:
 
     @classmethod
     async def create(cls, mal_url):
-        tmp_file_name = random.randint(1, 99999999999999999999)
+        tmp_file_name = str(random.randint(1, 99999999999999999999)) + ".jpg"
         if not os.path.exists(constants.TMP_DIR):
             os.mkdir(constants.TMP_DIR)
 
@@ -24,6 +24,8 @@ class CharacterImage:
         upside_down_path = constants.TMP_DIR + "/flip_" + tmp_file_name
 
         image_response = requests.get(mal_url)
+        if not image_response.ok:
+            return None
         with open(normal_path, 'wb') as f:
             f.write(image_response.content)
 
