@@ -5,6 +5,7 @@ import bot_token
 
 ENVVAR_PREFIX = 'ACGB_'
 
+BOT_OBJECT = None
 CHARACTER_TIMEOUT = 30
 CURRENCY = "credits"
 DROP_TIMEOUT = 10 * 60  # 3600.0
@@ -25,3 +26,4 @@ UPGRADE_FROM_COSTS = {
     3: 20
 }
 
+TMP_DIR = "tmp"

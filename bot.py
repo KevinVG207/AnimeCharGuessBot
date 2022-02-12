@@ -8,6 +8,7 @@ import command as cmd
 import constants
 import database_tools as db
 import display
+import mal_tools
 from drop import Drop
 import name_tools as nt
 from show import Show
@@ -19,7 +20,7 @@ from waifu import Waifu, Character
 _command_map = dict()
 
 def command(*commands, **kwargs):
-    ''' Decorator to add a command to the bot. '''
+    """ Decorator to add a command to the bot. """
     global _command_map
 
     command_object = cmd.Command(**kwargs)
@@ -41,22 +42,27 @@ def command(*commands, **kwargs):
 class AnimeCharGuessBot(discord.Client):
     command_map = None
 
-    def __init__(self, token, prefix, admins, currency, **kwargs):
+    def __init__(self, token, prefix, admins, currency, resource_server, resource_channel, **kwargs):
         super().__init__(**kwargs)
         
         self.token = token
         self.prefix = prefix
         self.admins = admins
         self.currency = currency
+        self.resource_server = resource_server
+        self.resource_channel_id = resource_channel
+        self.resource_channel = None
+        self.show_queue = mal_tools.ShowQueue()
 
         self.active_trades = set()
         self.active_drops = dict()
 
 
     async def on_ready(self):
-        '''
+        """
         Runs on the bot connecting to Discord for the first time.
-        '''
+        """
+        constants.BOT_OBJECT = self
 
         db.enable_all_trades()
         db.enable_all_removes()
@@ -64,6 +70,10 @@ class AnimeCharGuessBot(discord.Client):
         print(f"Bot has logged in as {self.user}")
         for g in self.guilds:
             print(g.name, g.id)
+            if g.id == self.resource_server:
+                self.resource_channel = await g.fetch_channel(self.resource_channel_id)
+
+        print(f"Resource channel: {self.resource_channel.id}")
 
 
     async def on_guild_remove(self, guild):
@@ -71,13 +81,13 @@ class AnimeCharGuessBot(discord.Client):
 
 
     async def on_message(self, message):
-        '''
+        """
         Runs every time the bot can see a new message.
 
         Used for two things:
             - Handling commands
             - Triggering random drops
-        '''
+        """
 
         # Ignore messages from bots, including this one.
         if message.author.bot:
@@ -133,43 +143,43 @@ class AnimeCharGuessBot(discord.Client):
 
 
     def format(self, message):
-        '''
+        """
         Formats a string with constants defined by the bot. (And also the next daily reset.)
 
         Used by help messages, as they are not created dynamically.
-        '''
+        """
 
         return message.replace('%PREFIX%', self.prefix).replace('%CURRENCY%', self.currency).replace('%DAILYRESET%', str(util.next_daily_reset()))
     
 
     def drop_chance(self, guild):
-        '''
+        """
         Get the chance per message of a random drop happening in a guild.
-        '''
+        """
 
         return 10 / max(100, guild.member_count)
 
 
     def is_bot_admin(self, user_id):
-        '''
+        """
         Check if a user is an admin of the bot.
-        '''
+        """
 
         return str(user_id) in self.admins
 
 
     def run(self):
-        '''
+        """
         Creates an event loop and runs the bot, blocking.
-        '''
+        """
 
         super().run(self.token)
     
 
     def start_trade(self, user1, user2):
-        '''
+        """
         Creates a trade between two users.
-        '''
+        """
 
         if user1.id == user2.id or not db.can_trade(user1.id) or not db.can_trade(user2.id) or not db.can_remove(user1.id) or not db.can_remove(user2.id):
             return None
@@ -184,18 +194,18 @@ class AnimeCharGuessBot(discord.Client):
     
 
     def remove_trade(self, trade):
-        '''
+        """
         Removes a trade and allows the participating users to trade again.
-        '''
+        """
 
         self.active_trades.remove(trade)
         trade.mark_trade_over()
 
 
     def timeout_trades(self):
-        '''
+        """
         Quietly remove any trades that have been inactive for too long.
-        '''
+        """
 
         timed_out = []
 
@@ -208,9 +218,9 @@ class AnimeCharGuessBot(discord.Client):
 
 
     def get_trade_involving(self, user_id):
-        '''
+        """
         Finds what trade, if any, a user is currently part of.
-        '''
+        """
 
         self.timeout_trades()
 
@@ -220,11 +230,11 @@ class AnimeCharGuessBot(discord.Client):
     
 
     async def yes_message(self, orig_msg, timeout = constants.REMOVAL_TIMEOUT):
-        '''
+        """
         Waits for a user to say "yes" or a timeout to occur.
 
         Returns if "yes" was said, and the confimation or denial message.
-        '''
+        """
 
         try:
             next_msg = await self.wait_for('message', check = lambda msg: msg.author.id == orig_msg.author.id, timeout = timeout)
@@ -235,9 +245,9 @@ class AnimeCharGuessBot(discord.Client):
 
 
     async def drop(self, guild):
-        '''
+        """
         Run a random drop in a guild.
-        '''
+        """
 
         assigned_channel_id = db.get_assigned_channel_id(guild.id)
 
@@ -269,9 +279,9 @@ class AnimeCharGuessBot(discord.Client):
 
 
     async def give_drop(self, drop, message):
-        '''
+        """
         Reward a user for guessing a drop.
-        '''
+        """
 
         bonus = random.randint(50, 125)
         upgrade = not random.randint(0, 9)
@@ -299,13 +309,19 @@ class AnimeCharGuessBot(discord.Client):
         ))
 
 
+    async def send_character_images(self, normal_path, mirror_path, upside_down_path):
+        """
+        Sends images to the resource channel and returns the image URLs.
+        """
+
+
     @command('a.drop', require_bot_admin = True)
     async def command_admin_drop(self, args):
-        '''
+        """
         Force a drop to occur. (Bot admin only)
 
         Forces a drop to occur in this guild. If there is already a drop running, it will be cancelled.
-        '''
+        """
 
         if args.arguments_string:
             return cmd.BAD_USAGE
@@ -315,11 +331,11 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('a.setmoney', require_bot_admin = True)
     async def command_admin_setmoney(self, args):
-        '''
+        """
         Change a user's money. (Bot admin only)
 
         Usage: ``%PREFIX%%COMMAND% [user] <money>``
-        '''
+        """
 
         arg_list = args.arguments_string.split()
 
@@ -346,13 +362,38 @@ class AnimeCharGuessBot(discord.Client):
         ))
 
 
+    @command('a.add', require_bot_admin=True)
+    async def command_admin_add(self, args):
+        """
+        Adds a new show to the bot. (Bot admin only)
+
+        Places a MAL URL into the adding queue.
+        Usage: ``%PREFIX%a.add <MAL URL>``
+        """
+
+        if not args.arguments_string:
+            return cmd.BAD_USAGE
+
+        url_string = args.arguments_string
+
+        self.show_queue.add_url(url_string)
+
+        await args.message.reply(embed = display.create_embed("Show added to queue", f"Queue length: {len(self.show_queue)}"))
+
+        if not self.show_queue.running:
+            self.show_queue.running = True
+            await mal_tools.run_queue(self)
+
+        return
+
+
     @command('assign', require_server_admin = True, only_in_assigned_channel = False)
     async def command_assign(self, args):
-        '''
+        """
         Assign the bot to a channel. (Admin only)
 
         Assigns the bot to a channel. The bot will only respond to messages in the channel it has been assigned.
-        '''
+        """
 
         if args.arguments_string:
             return cmd.BAD_USAGE
@@ -366,12 +407,12 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('daily')
     async def command_daily(self, args):
-        '''
+        """
         Claim daily %CURRENCY%.
 
         Claim your daily %CURRENCY%.
         Resets at <t:%DAILYRESET%:t>.
-        '''
+        """
 
         if args.arguments_string:
             return cmd.BAD_USAGE
@@ -400,9 +441,9 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('drop')
     async def command_drop(self, args):
-        '''
+        """
         See what the current random drop is.
-        '''
+        """
 
         if args.arguments_string:
             return cmd.BAD_USAGE
@@ -429,7 +470,7 @@ class AnimeCharGuessBot(discord.Client):
     # These commands are handled by the same function as they are mostly the same.
     @command('fav', 'unfav')
     async def command_fav(self, args):
-        '''
+        """
         Favorite or unfavourite a waifu.
 
         Add or remove a waifu in your inventory from your favorites.
@@ -437,7 +478,7 @@ class AnimeCharGuessBot(discord.Client):
         Usage:
         ``%PREFIX%fav <inventory number> ...`` or
         ``%PREFIX%unfav <inventory number> ...``
-        '''
+        """
 
         try:
             indices = [int(i) for i in args.arguments_string.split()]
@@ -487,13 +528,13 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('give', 'gift')
     async def command_give(self, args):
-        '''
+        """
         Give a user %CURRENCY%.
 
         Gift some of your %CURRENCY% to someone else.
 
         Usage: ``%PREFIX%%COMMAND% <user> <amount> [-y]``
-        '''
+        """
 
         arg_list = args.arguments_string.split()
 
@@ -572,11 +613,11 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('help', only_in_assigned_channel = False)
     async def command_help(self, args):
-        '''
+        """
         Show this help message. Use ``%PREFIX%help [command]`` to get help for a specific command.
 
         Display information about a command. Use ``%PREFIX%help`` to get a list of commands, and ``%PREFIX%help [command]`` to get more information on a specific command.
-        '''
+        """
 
         if args.arguments_string:
             # Looking for help for a specific command.
@@ -638,24 +679,24 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('ping')
     async def command_ping(self, args):
-        '''
+        """
         Pong.
 
         Ping command for testing if the bot is responding.
-        '''
+        """
 
         await args.message.reply('Pong! :ping_pong:')
 
 
     @command('profile')
     async def command_profile(self, args):
-        '''
+        """
         View your (or someone else's) profile.
 
         Display your profile page. Mention a user to see theirs.
 
         Usage: ``%PREFIX%%COMMAND% [user]``
-        '''
+        """
 
         if args.arguments_string:
             if not args.guild:
@@ -682,7 +723,7 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('remove', 'rm', 'yeet')
     async def command_remove(self, args):
-        '''
+        """
         Let one or more of your waifus go.
 
         Let one of your waifus go. This will reward you %CURRENCY% depending on the rarity of the waifu.
@@ -693,7 +734,7 @@ class AnimeCharGuessBot(discord.Client):
 
         Usage: ``%PREFIX%%COMMAND% <inventory number> ... [-y] [-force]``
         You can also remove multiple waifus by using a search query the same as %PREFIX%waifus.
-        '''
+        """
         
         if db.can_remove(args.user.id) and db.can_trade(args.user.id):
             db.disable_remove(args.user.id)
@@ -805,12 +846,12 @@ class AnimeCharGuessBot(discord.Client):
 
                 await args.message.reply(embed = display.create_embed(
                     'Waifu Removal Confirmation',
-                    textwrap.dedent(f'''
+                    textwrap.dedent(f"""
                     You are about to remove {waifu}.
                     Removing this waifu will award you **{db.get_rarity_currency(waifu.rarity)}** {self.currency}.
                     If you agree with this removal, respond with ``yes``.
                     Respond with anything else or wait {constants.REMOVAL_TIMEOUT} seconds to cancel the removal.
-                    '''
+                    """
                     ).strip(),
                     thumbnail = waifu.image_url
                 ))
@@ -925,7 +966,7 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('roll')
     async def command_roll(self, args):
-        '''
+        """
         Perform a gacha roll. (Default: 100 %CURRENCY%)
 
         Perform a gacha roll with optional infusion of %CURRENCY%.
@@ -938,7 +979,7 @@ class AnimeCharGuessBot(discord.Client):
           ``★★★★★: 15000``
 
         Usage: ``%PREFIX%%COMMAND% [%CURRENCY%]``
-        '''
+        """
 
         price = 100
 
@@ -977,13 +1018,13 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('search')
     async def command_search(self, args):
-        '''
+        """
         Find a series.
 
         Look for anime or manga that the bot has characters of.
 
         Usage: ``%PREFIX%%COMMAND% <name>``
-        '''
+        """
 
         query = args.arguments_string.strip()
 
@@ -1020,13 +1061,13 @@ class AnimeCharGuessBot(discord.Client):
     
     @command('series', 'show')
     async def command_series(self, args):
-        '''
+        """
         View characters of a series.
 
         Displays the characters of a show that the bot has.
 
         Usage: ``%PREFIX%%COMMAND% <show id or name>``
-        '''
+        """
 
         query = args.arguments_string.strip()
 
@@ -1077,7 +1118,7 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('trade')
     async def command_trade(self, args):
-        '''
+        """
         Start a trade offer with another user.
 
         Start a trade offer or modify/confirm an existing trade offer.
@@ -1089,7 +1130,7 @@ class AnimeCharGuessBot(discord.Client):
         ``%PREFIX%%COMMAND% %CURRENCY% <amount>`` - Set the amount of currency to trade
         ``%PREFIX%%COMMAND% confirm`` - Confirm the trade
         ``%PREFIX%%COMMAND% cancel`` - Cancel the trade
-        '''
+        """
 
         arg_list = args.arguments_string.split()
 
@@ -1236,11 +1277,11 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('upgrade')
     async def command_upgrade(self, args):
-        '''
+        """
         Upgrade the star rating of a waifu using upgrade parts.
 
         Usage: ``%PREFIX%%COMMAND% <inventory number> [-y]``
-        '''
+        """
 
         args_list = args.arguments_string.split()
 
@@ -1323,7 +1364,7 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('view')
     async def command_view(self, args):
-        '''
+        """
         View details of a character including stats.
 
         View a character's detail page.
@@ -1331,7 +1372,7 @@ class AnimeCharGuessBot(discord.Client):
         Usage:
           ``%PREFIX%%COMMAND% <character id>`` or
           ``%PREFIX%%COMMAND% <name>``
-        '''
+        """
 
         if not args.arguments_string:
             return cmd.BAD_USAGE
@@ -1392,13 +1433,13 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('wager')
     async def command_wager(self, args):
-        '''
+        """
         Wager %CURRENCY% and have 50% chance to double them.
 
         Wager %CURRENCY% with a 50% chance of doubling them. (Or losing them :P)
 
         Usage: ``%PREFIX%%COMMAND% <amount>``
-        '''
+        """
 
         if not args.arguments_string.isnumeric():
             return cmd.BAD_USAGE
@@ -1431,13 +1472,13 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('waifu')
     async def command_waifu(self, args):
-        '''
+        """
         View one of your collected waifus in more detail.
 
         View details and the image of a waifu you have collected. Use ``-u`` to view another user's waifus.
         
         Usage: ``%PREFIX%%COMMAND% [-u <user>] <number>``
-        '''
+        """
 
         arg_list = args.arguments_string.split()
 
@@ -1482,7 +1523,7 @@ class AnimeCharGuessBot(discord.Client):
 
     @command('waifus', 'list')
     async def command_waifus(self, args):
-        '''
+        """
         View your collected waifus.
 
         View your (or someone else's) collected waifus inventory.
@@ -1496,7 +1537,7 @@ class AnimeCharGuessBot(discord.Client):
           [(-r | -rarity) <number>]
           [(-f | -fav | -favorite)]
           [(-p | -page) <page number>]``
-        '''
+        """
 
         arg_list = shlex.split(args.arguments_string)
 

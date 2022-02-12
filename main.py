@@ -17,11 +17,20 @@ intents = discord.Intents().all()
 
 token = os.environ[f'{constants.ENVVAR_PREFIX}TOKEN']
 
+resource_server = os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_SERVER']
+resource_channel = os.environ[f'{constants.ENVVAR_PREFIX}RESOURCE_CHANNEL']
+
 admins = [
     admin_id.strip()
     for admin_id in os.environ.get(f'{constants.ENVVAR_PREFIX}ADMIN', '').split(',')
     if admin_id
 ]
 
-client = bot.AnimeCharGuessBot(token = token, intents = intents, prefix = constants.PREFIX, currency = constants.CURRENCY, admins = admins)
+client = bot.AnimeCharGuessBot(token = token,
+                               intents = intents,
+                               prefix = constants.PREFIX,
+                               currency = constants.CURRENCY,
+                               admins = admins,
+                               resource_server = resource_server,
+                               resource_channel = resource_channel)
 client.run()

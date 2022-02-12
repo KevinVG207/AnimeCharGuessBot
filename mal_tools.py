@@ -1,6 +1,12 @@
+import asyncio
+import os
+
 import requests
 from bs4 import BeautifulSoup
 import time
+from PIL import Image, ImageOps
+
+import constants
 import database_tools as db
 
 
@@ -27,7 +33,7 @@ def getShowID(show_url):
     return None
 
 
-def downloadInsertShowCharacters(show_url, overwrite=False):
+async def downloadInsertShowCharacters(show_url, overwrite=False):
     show_url_segment, is_manga = getShowURLSegment(show_url)
     mal_id = getShowID(show_url)
     if not show_url_segment or not mal_id:
@@ -35,7 +41,6 @@ def downloadInsertShowCharacters(show_url, overwrite=False):
         return -1
     print("="*20)
     print(show_url_segment)
-    time.sleep(1)
     if is_manga:
         request_url = f"https://myanimelist.net/manga/{show_url_segment}"
     else:
@@ -86,21 +91,23 @@ def downloadInsertShowCharacters(show_url, overwrite=False):
                     # Add show to character.
                     db.add_show_to_character(character_id, show_id)
                     continue
-        db.insert_character(downloadCharacterFromURL(character_url["href"]))
+        db.insert_character(await downloadCharacterFromURL(character_url["href"]))
         db.add_show_to_character(character_id, show_id)
+
+    await asyncio.sleep(20)
 
 
 def getCharacterIDFromURL(character_url):
     return character_url.split("myanimelist.net/character/")[1].split("/")[0]
 
 
-def downloadCharacterFromURL(character_url):
-    return downloadCharacter(character_url.split("myanimelist.net/character/")[1].split("/")[0])
+async def downloadCharacterFromURL(character_url):
+    return await downloadCharacter(character_url.split("myanimelist.net/character/")[1].split("/")[0])
 
 
-def downloadCharacter(char_id):
+async def downloadCharacter(char_id):
     print(f"Downloading character {char_id}", end=" ")
-    time.sleep(20)
+    await asyncio.sleep(20)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")
@@ -121,7 +128,7 @@ def downloadCharacter(char_id):
         if link["href"].endswith("/pics"):
             image_page_url = link["href"]
 
-    image_urls = downloadImages(image_page_url)
+    image_urls = await getImageURLs(image_page_url)
 
     return {"char_id": char_id,
             "en_name": en_name.strip(),
@@ -129,8 +136,8 @@ def downloadCharacter(char_id):
             "image_urls": image_urls}
 
 
-def downloadImages(image_page_url):
-    time.sleep(2)
+async def getImageURLs(image_page_url):
+    await asyncio.sleep(2)
     image_page = requests.get(image_page_url)
     img_soup = BeautifulSoup(image_page.content, "html.parser")
 
@@ -142,3 +149,66 @@ def downloadImages(image_page_url):
 
     # Remove duplicates
     return list(dict.fromkeys(image_urls))
+
+
+class CharacterImage:
+
+    @classmethod
+    async def create(cls, mal_url):
+        tmp_file_name = mal_url.rsplit("/", 1)[1]
+        if not os.path.exists(constants.TMP_DIR):
+            os.mkdir(constants.TMP_DIR)
+
+        normal_path = constants.TMP_DIR + "/norm_" + tmp_file_name
+        mirror_path = constants.TMP_DIR + "/mirr_" + tmp_file_name
+        upside_down_path = constants.TMP_DIR + "/flip_" + tmp_file_name
+
+        image_response = requests.get(mal_url)
+        with open(normal_path, 'wb') as f:
+            f.write(image_response.content)
+
+        # Flip and mirror the image
+        normal_image = Image.open(normal_path)
+        mirror_image = ImageOps.mirror(normal_image)
+        mirror_image.save(mirror_path, quality=90)
+        upside_down_image = ImageOps.flip(normal_image)
+        upside_down_image.save(upside_down_path, quality=90)
+
+
+
+        return cls(normal_url, mirror_url, upside_down_url)
+
+    def __init__(self, normal_url, mirror_url, upside_down_url):
+        self.normal_url = normal_url
+        self.mirror_url = mirror_url
+        self.upside_down_url = upside_down_url
+
+
+class ShowQueue:
+    def __init__(self):
+        self.running = False
+        self.show_queue = []
+
+    def has_next(self):
+        return bool(self.show_queue)
+
+
+    def __len__(self):
+        return len(self.show_queue)
+
+
+    def get_url(self):
+        if self.show_queue:
+            return self.show_queue.pop(0)
+        else:
+            return None
+
+
+    def add_url(self, url):
+        self.show_queue.append(url)
+
+
+async def run_queue(show_queue: ShowQueue):
+    while show_queue.has_next():
+        await downloadInsertShowCharacters(show_queue.get_url())
+    show_queue.running = False
