@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import aiohttp.client_exceptions
 import discord
@@ -56,6 +57,7 @@ class AnimeCharGuessBot(discord.Client):
         self.resource_channel_id = resource_channel
         self.resource_channel = None
         self.show_queue = mal_tools.ShowQueue()
+        self.cooldowns = {}
 
         self.active_trades = set()
         self.active_drops = dict()
@@ -120,13 +122,15 @@ class AnimeCharGuessBot(discord.Client):
                 # The command exists, run it.
                 is_server_admin = message.channel.permissions_for(message.author).administrator
                 is_bot_admin = self.is_bot_admin(message.author.id)
+                is_in_cooldown = self.is_in_cooldown(message.author.id)
 
                 arguments = cmd.CommandArguments(
                     message = message,
                     command = command_name,
                     arguments_string = arguments_string,
                     is_server_admin = is_server_admin,
-                    is_bot_admin = is_bot_admin
+                    is_bot_admin = is_bot_admin,
+                    is_in_cooldown = is_in_cooldown
                 )
 
                 try:
@@ -176,6 +180,20 @@ class AnimeCharGuessBot(discord.Client):
         """
 
         return str(user_id) in self.admins
+
+
+    def is_in_cooldown(self, user_id):
+        """
+        Check if a user is currently in cooldown.
+        """
+        return time.time() - self.cooldowns.get(user_id, 0) < constants.COOLDOWN_SECONDS
+
+
+    def set_cooldown(self, user_id):
+        """
+        Sets the cooldown time of a user.
+        """
+        self.cooldowns[user_id] = time.time()
 
 
     def run(self):

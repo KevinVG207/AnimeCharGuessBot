@@ -1,6 +1,4 @@
 import textwrap
-
-import constants
 import display
 import database_tools as db
 
@@ -13,10 +11,11 @@ class Command:
     A command available for the bot.
     '''
     
-    def __init__(self, require_server_admin = False, require_bot_admin = False, only_in_assigned_channel = True):
+    def __init__(self, require_server_admin = False, require_bot_admin = False, only_in_assigned_channel = True, ignore_cooldown = False):
         self.require_server_admin = require_server_admin
         self.require_bot_admin = require_bot_admin
         self.only_in_assigned_channel = only_in_assigned_channel
+        self.ignore_cooldown = ignore_cooldown
         self.function = None
         self.short_help = None
         self.long_help = None
@@ -64,6 +63,10 @@ class Command:
         '''
         Run the command with some arguments.
         '''
+        # Check for cooldown
+        if not arguments.is_bot_admin and not self.ignore_cooldown and arguments.is_in_cooldown:
+            return
+        bot.set_cooldown(arguments.user.id)
 
         # Check if in the correct channel.
         if self.only_in_assigned_channel and arguments.message.guild and arguments.message.channel.id != db.get_assigned_channel_id(arguments.message.guild.id):
@@ -132,12 +135,13 @@ class CommandArguments:
     The context passed to a command when it is run.
     '''
 
-    def __init__(self, message, command, arguments_string, is_server_admin, is_bot_admin):
+    def __init__(self, message, command, arguments_string, is_server_admin, is_bot_admin, is_in_cooldown):
         self.message = message
         self.command = command
         self.arguments_string = arguments_string
         self.is_server_admin = is_server_admin
         self.is_bot_admin = is_bot_admin
+        self.is_in_cooldown = is_in_cooldown
 
         self.user = message.author
         self.channel = message.channel
