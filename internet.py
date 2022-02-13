@@ -22,9 +22,14 @@ def verify():
 def handle_disconnect():
     print(f"{datetime.now()} Failed to connect to the internet.")
     retries = 0
-    while retries < 4 or time.time() - constants.START_TIME < 600:
+    while retries < 8 or time.time() - constants.START_TIME < 600:
+        if not bot_token.isDebug():
+            print(f"{datetime.now()} Restarting wlan0")
+            os.system("sudo ifconfig wlan0 down")
+            time.sleep(1)
+            os.system("sudo ifconfig wlan0 up")
         # Sleep for 30 seconds.
-        time.sleep(30)
+        time.sleep(15)
         print(f"{datetime.now()} Checking for reconnect...")
         if verify():
             print(f"{datetime.now()} Reconnected.")
@@ -34,6 +39,7 @@ def handle_disconnect():
     # Retries failed, reboot system.
     print(f"{datetime.now()} Reconnecting failed. Rebooting.")
     reboot()
+
 
 def reboot():
     if bot_token.isDebug():

@@ -1,4 +1,6 @@
 import asyncio
+
+import aiohttp.client_exceptions
 import discord
 import random
 import shlex
@@ -127,7 +129,10 @@ class AnimeCharGuessBot(discord.Client):
                     is_bot_admin = is_bot_admin
                 )
 
-                await command_object.run(self, arguments)
+                try:
+                    await command_object.run(self, arguments)
+                except aiohttp.client_exceptions.ClientConnectorError:
+                    await self.on_disconnect()
 
         elif message_content and message.guild:
             # Not a command, but we are in a guild, so we might want to drop or check if a drop guess is correct.
@@ -325,7 +330,7 @@ class AnimeCharGuessBot(discord.Client):
         return [attachment.url for attachment in message.attachments]
 
     @command('a.reboot', require_bot_admin=True)
-    async def command_admin_drop(self, args):
+    async def command_admin_reboot(self, args):
         """
         Reboots the bot. (Bot admin only)
 
@@ -335,6 +340,7 @@ class AnimeCharGuessBot(discord.Client):
         if args.arguments_string:
             return cmd.BAD_USAGE
 
+        await args.message.reply(embed = display.create_embed("Rebooting.", "Now rebooting..."))
         internet.reboot()
 
 
