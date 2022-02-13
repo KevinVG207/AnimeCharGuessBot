@@ -72,6 +72,8 @@ class AnimeCharGuessBot(discord.Client):
         db.enable_all_trades()
         db.enable_all_removes()
 
+        await internet.send_downtime_message(from_reboot=True)
+
         print(f"Bot has logged in as {self.user}")
         for g in self.guilds:
             print(g.name, g.id)
@@ -153,7 +155,15 @@ class AnimeCharGuessBot(discord.Client):
 
 
     async def on_disconnect(self):
-        internet.handle_disconnect()
+        await internet.handle_disconnect()
+        return
+
+
+    async def send_admin_dm(self, embed):
+        for admin_id in self.admins:
+            admin_user = await self.fetch_user(admin_id)
+            await admin_user.send(embed=embed)
+        return
 
 
     def format(self, message):
@@ -433,8 +443,11 @@ class AnimeCharGuessBot(discord.Client):
 
         return
 
-    @command('a.makeimages', require_bot_admin=True)
-    async def command_admin_makeimages(self, args):
+    @command('a.update', require_bot_admin=True)
+    async def command_admin_update(self, args):
+        """
+        Updates character images.
+        """
         await db.update_images()
 
 

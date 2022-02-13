@@ -30,7 +30,7 @@ def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = N
         title = title,
         description = desciption,
         color = constants.EMBED_COLOR,
-        timestamp = datetime.datetime.utcnow()
+        timestamp = datetime.datetime.now()
     )
 
     if thumbnail is not None:

@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+import asyncio
 import os
 
 import discord
@@ -10,7 +10,7 @@ import internet
 
 # Verify internet connection.
 if not internet.verify():
-    internet.handle_disconnect()
+    asyncio.run(internet.handle_disconnect(from_reboot=True))
 
 
 logger = logging.getLogger('discord')

@@ -1,3 +1,4 @@
+import math
 import os
 import time
 
@@ -5,6 +6,7 @@ import requests
 
 import bot_token
 import constants
+import display
 import util
 from datetime import datetime
 
@@ -19,8 +21,9 @@ def verify():
     return resp.status_code == 200
 
 
-def handle_disconnect():
+async def handle_disconnect(from_reboot = False):
     print(f"{datetime.now()} Failed to connect to the internet.")
+    write_downtime()
     retries = 0
     while retries < 8 or time.time() - constants.START_TIME < 600:
         if not bot_token.isDebug():
@@ -33,6 +36,7 @@ def handle_disconnect():
         print(f"{datetime.now()} Checking for reconnect...")
         if verify():
             print(f"{datetime.now()} Reconnected.")
+            await send_downtime_message(from_reboot)
             return
         retries += 1
 
@@ -45,3 +49,22 @@ def reboot():
     if bot_token.isDebug():
         quit(404)
     os.system("sudo reboot")
+
+
+def write_downtime():
+    with open("down.time", "w") as f:
+        f.write(f"{math.floor(time.time())}")
+
+
+async def send_downtime_message(from_reboot = False):
+    if os.path.exists("down.time"):
+        try:
+            f = open("down.time", "r")
+            down_time = int(f.readline())
+            f.close()
+            os.remove("down.time")
+            await constants.BOT_OBJECT.send_admin_dm(display.create_embed("Bot was down.", f"From: <t:{down_time}>\nUntil: <t:{math.floor(time.time())}>{' (from reboot)' if from_reboot else ''}"))
+
+        except ValueError:
+            pass
+    return
