@@ -4,23 +4,9 @@ import time
 import constants
 import database_tools as db
 import display
-import http_tools as http
 import name_tools as nt
+import util
 from waifu import Waifu
-
-async def verify_image(url):
-    """
-    Check if an image actually exists on the remote server.
-    """
-
-    try:
-        resp = await http.request('head', url)
-    
-    except Exception:
-        return False
-
-    return resp.status_code == 200
-
 
 class Drop:
     """
@@ -44,10 +30,10 @@ class Drop:
         else:
             image_url = waifu.flipped_url
 
-        if not await verify_image(image_url):
+        if not await util.verify_url(image_url):
             # Fallback to MAL URL.
             image_url = waifu.image_url
-            if not await verify_image(image_url):
+            if not await util.verify_url(image_url):
                 return await cls.create(channel)
 
         db.update_history(channel.guild.id, history, data)
@@ -92,5 +78,5 @@ class Drop:
         return display.create_embed(
             'Timed out!',
             f'**{self.waifu.character.en_name}** gave up waiting.\nBetter luck next time!\n{self.waifu.character.source_string()}',
-            image = self.drop_image_url
+            image = self.waifu.image_url
         )

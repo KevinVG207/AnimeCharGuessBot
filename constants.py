@@ -1,9 +1,12 @@
 import discord
+import time
 
 # Constants used by the bot in various places.
 import bot_token
 
 ENVVAR_PREFIX = 'ACGB_'
+START_TIME = time.time()
+VERIFICATION_URL = "https://8.8.8.8/"
 
 BOT_OBJECT = None
 CHARACTER_TIMEOUT = 30

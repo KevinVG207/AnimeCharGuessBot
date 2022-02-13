@@ -8,6 +8,7 @@ import command as cmd
 import constants
 import database_tools as db
 import display
+import internet
 import mal_tools
 from drop import Drop
 import name_tools as nt
@@ -140,6 +141,10 @@ class AnimeCharGuessBot(discord.Client):
             elif drop is None and random.random() < self.drop_chance(message.guild):
                 # A drop was not running, so start one.
                 await self.drop(message.guild)
+
+
+    async def on_disconnect(self):
+        internet.handle_disconnect()
 
 
     def format(self, message):
@@ -318,6 +323,19 @@ class AnimeCharGuessBot(discord.Client):
                  discord.File(fp=upside_down_path))
         message = await self.resource_channel.send(files=files)
         return [attachment.url for attachment in message.attachments]
+
+    @command('a.reboot', require_bot_admin=True)
+    async def command_admin_drop(self, args):
+        """
+        Reboots the bot. (Bot admin only)
+
+        When this command is executed, the bot will be restarted.
+        """
+
+        if args.arguments_string:
+            return cmd.BAD_USAGE
+
+        internet.reboot()
 
 
     @command('a.drop', require_bot_admin = True)

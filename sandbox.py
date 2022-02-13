@@ -4,9 +4,12 @@ import mal_tools as mal
 import database_tools as db
 
 
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/33573/BanG_Dream")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48753/Jahy-sama_wa_Kujikenai")
-mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48556/Takt_Op_Destiny")
+conn, cursor = db.get_connection()
+
+cursor.execute("""UPDATE character SET en_name = 'MA347612890GT4078579132R74 00Z 17924398TZR Two Thousand Modular Guided Type 452963752391MQTO Gold Launch System GLS-equipped Self-Judgment Model Type Double-O Three Seven 293165734285YGNKTIO1200YMCA4126PPPKG53 Normad', alt_name = 'Normad' WHERE id = 10679""")
+
+conn.commit()
+conn.close()
 
 quit()
 
@@ -18,7 +21,9 @@ mal.downloadInsertShowCharacters("https://myanimelist.net/manga/7519/Kami_nomi_z
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/123450/Saikin_Yatotta_Maid_ga_Ayashii")
 mal.downloadInsertShowCharacters("https://myanimelist.net/manga/138079/Genshin_Comic_Anthology")
 
-
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/33573/BanG_Dream")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48753/Jahy-sama_wa_Kujikenai")
+mal.downloadInsertShowCharacters("https://myanimelist.net/anime/48556/Takt_Op_Destiny")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/22147/Amagi_Brilliant_Park")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/10721/Mawaru_Penguindrum")
 mal.downloadInsertShowCharacters("https://myanimelist.net/anime/16732/Kiniro_Mosaic")

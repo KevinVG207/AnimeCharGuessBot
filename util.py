@@ -1,7 +1,23 @@
 import datetime
 import discord
 import time
+import http_tools as http
 from urllib.parse import urlparse
+
+
+async def verify_url(url):
+    """
+    Check if a URL gets a 200 status code.
+    """
+
+    try:
+        resp = await http.request('head', url)
+
+    except Exception:
+        return False
+
+    return resp.status_code == 200
+
 
 async def parse_user(text, guild):
     '''

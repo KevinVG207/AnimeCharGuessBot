@@ -6,6 +6,12 @@ import discord
 import logging
 import constants
 import bot
+import internet
+
+# Verify internet connection.
+if not internet.verify():
+    internet.handle_disconnect()
+
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.WARNING)
