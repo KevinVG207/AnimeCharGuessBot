@@ -102,7 +102,8 @@ async def run():
                 translated_message,
                 color=Color.from_rgb(105, 193, 12),
                 image=article.get("image"),
-                footer="Uma Musume News"
+                footer="Uma Musume News",
+                timestamp=datetime.fromtimestamp(article_tuple[0])
             ))
 
         await asyncio.sleep(750)
