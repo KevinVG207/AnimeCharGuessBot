@@ -6,7 +6,15 @@ import database_tools as db
 
 conn, cursor = db.get_connection()
 
-cursor.execute("""UPDATE character SET en_name = 'MA347612890GT4078579132R74 00Z 17924398TZR Two Thousand Modular Guided Type 452963752391MQTO Gold Launch System GLS-equipped Self-Judgment Model Type Double-O Three Seven 293165734285YGNKTIO1200YMCA4126PPPKG53 Normad', alt_name = 'Normad' WHERE id = 10679""")
+cursor.execute("""select w.id, i.character_id from images i
+JOIN waifus w on w.images_id = i.id
+where normal_url is null;
+""")
+rows = cursor.fetchall()
+for row in rows:
+    waifu_id = row[0]
+    char_id = row[1]
+
 
 conn.commit()
 conn.close()

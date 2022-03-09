@@ -31,10 +31,7 @@ class Drop:
             image_url = waifu.flipped_url
 
         if not await util.verify_url(image_url):
-            # Fallback to MAL URL.
-            image_url = waifu.image_url
-            if not await util.verify_url(image_url):
-                return await cls.create(channel)
+            return await cls.create(channel)
 
         db.update_history(channel.guild.id, history, data)
         return cls(waifu, channel, image_url)

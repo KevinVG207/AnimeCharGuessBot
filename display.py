@@ -14,16 +14,16 @@ RARITY_STRINGS = (
 )
 
 def rarity_string(rarity):
-    '''
+    """
     Get the star value text for a rarity.
-    '''
+    """
     return RARITY_STRINGS[rarity]
 
 
 def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = None, image = None, footer = None):
-    '''
+    """
     Creates a Discord embed containing text, and optionally other properties.
-    '''
+    """
 
     embed = discord.Embed(
         type = "rich",
@@ -46,10 +46,10 @@ def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = N
 
 
 async def page(bot, args, waifus, title, page_no = None):
-    '''
+    """
     Creates a paginated display of a list of waifus.
     Paging is controlled by Discord buttons, and is locked if too much time passes since the last use.
-    '''
+    """
 
     if not waifus:
         await args.message.reply(embed = create_embed(

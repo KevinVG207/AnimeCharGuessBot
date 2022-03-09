@@ -357,6 +357,7 @@ class AnimeCharGuessBot(discord.Client):
         message = await self.resource_channel.send(files=files)
         return [attachment.url for attachment in message.attachments]
 
+
     @command('a.reboot', require_bot_admin=True)
     async def command_admin_reboot(self, args):
         """
@@ -450,6 +451,26 @@ class AnimeCharGuessBot(discord.Client):
         """
         await db.update_images()
 
+
+    # @command('a.changename', require_bot_admin=True)
+    # async def command_admin_changename(self, args):
+    #     """
+    #     Changes the English name of a character.
+    #     """
+    #     if not args.arguments_string:
+    #         return cmd.BAD_USAGE
+    #
+    #     arg_list = args.arguments_string.split(" ", 1)
+    #
+    #     if len(arg_list) != 2:
+    #         return cmd.BAD_USAGE
+    #
+    #     char_id, en_name = arg_list
+    #
+    #     if not db.character_exists(char_id):
+    #         return await
+    #
+    #     await db.change_name(char_id, en_name)
 
     @command('assign', require_server_admin = True, only_in_assigned_channel = False)
     async def command_assign(self, args):

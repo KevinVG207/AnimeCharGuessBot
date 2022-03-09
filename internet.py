@@ -1,3 +1,4 @@
+import asyncio
 import math
 import os
 import time
@@ -15,14 +16,20 @@ def verify():
     try:
         resp = requests.request('head', constants.VERIFICATION_URL)
 
-    except Exception:
+    except requests.RequestException:
         return False
 
     return resp.status_code == 200
 
 
 async def handle_disconnect(from_reboot = False):
-    print(f"{datetime.now()} Failed to connect to the internet.")
+    # Wait and hope it fixes itself.
+    if not from_reboot:
+        await asyncio.sleep(15)
+        if verify():
+            return
+
+    print(f"{datetime.now()} Failed to connect to discord.")
     write_downtime()
     retries = 0
     while retries < 8 or time.time() - constants.START_TIME < 600:
@@ -36,7 +43,10 @@ async def handle_disconnect(from_reboot = False):
         print(f"{datetime.now()} Checking for reconnect...")
         if verify():
             print(f"{datetime.now()} Reconnected.")
-            await send_downtime_message(from_reboot)
+            if not from_reboot:
+                # If we're from reboot, the bot hasn't started yet.
+                # Instead, we just wait until on_ready() calls send_downtime_message().
+                await send_downtime_message()
             return
         retries += 1
 
@@ -57,7 +67,7 @@ def write_downtime():
 
 
 async def send_downtime_message(from_reboot = False):
-    if os.path.exists("down.time"):
+    if os.path.exists("down.time") and constants.BOT_OBJECT:
         try:
             f = open("down.time", "r")
             down_time = int(f.readline())

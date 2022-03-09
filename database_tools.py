@@ -42,13 +42,13 @@ def insert_character(char_data, alt_name=None):
     char_id = char_data["char_id"]
     en_name = char_data["en_name"]
     jp_name = char_data["jp_name"]
-    image_urls = char_data["image_urls"]
+    images = char_data["images"]
 
     if character_exists(char_id):
         print(f"Character {char_id} {en_name} already exists in the database.")
         return
 
-    if not image_urls:
+    if not images:
         print(f"Character {char_id} {en_name} does not have any images. Skipping.")
         return
 
@@ -58,8 +58,8 @@ def insert_character(char_data, alt_name=None):
     cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""",
                    (char_id, en_name, jp_name, alt_name))
 
-    for image_url in image_urls:
-        cursor.execute("""INSERT INTO images (url, character_id) VALUES (?,?);""", (image_url, char_id))
+    for image in images:
+        cursor.execute("""INSERT INTO images (character_id, mal_url, normal_url, mirror_url, flipped_url) VALUES (?,?,?,?,?);""", (char_id, image.mal_url, image.normal_url, image.mirror_url, image.upside_down_url))
 
     conn.commit()
     conn.close()
@@ -203,11 +203,11 @@ def get_drop_data(history=None, price=None, user_id=None):
 
     char_id = random.choice(rows)[0]
     if bot_token.isDebug():
-        cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
+        cursor.execute("""SELECT en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
 LEFT JOIN images ON character.id = images.character_id
 WHERE images.droppable = 1 AND normal_url IS NOT NULL AND character.id = ?;""", (char_id,))
     else:
-        cursor.execute("""SELECT url, en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
+        cursor.execute("""SELECT en_name, alt_name, images.id, jp_name, normal_url, mirror_url, flipped_url FROM character
 LEFT JOIN images ON character.id = images.character_id
 WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     rows2 = cursor.fetchall()
@@ -215,21 +215,20 @@ WHERE images.droppable = 1 AND character.id = ?;""", (char_id,))
     conn.close()
 
     random.shuffle(rows2)
-    image_url = rows2[0][0]
-    en_name = rows2[0][1]
-    alt_name = rows2[0][2]
-    jp_name = rows2[0][4]
-    image_id = rows2[0][3]
-    normal_url = rows2[0][5]
-    mirror_url = rows2[0][6]
-    flipped_url = rows2[0][7]
+    en_name = rows2[0][0]
+    alt_name = rows2[0][1]
+    jp_name = rows2[0][3]
+    image_id = rows2[0][2]
+    normal_url = rows2[0][4]
+    mirror_url = rows2[0][5]
+    flipped_url = rows2[0][6]
     rarity, price = generate_rarity(price)
 
     cur_waifu = {"id": char_id,
-                 "image_url": image_url,
                  "en_name": en_name,
                  "jp_name": jp_name,
                  "alt_name": alt_name,
+                 "image_url": normal_url,
                  "image_id": image_id,
                  "rarity": rarity,
                  "normal_url": normal_url,
@@ -350,9 +349,9 @@ def get_all_waifu_data_for_user(user_id):
 
     cursor.execute("""SELECT en_name, jp_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
 FROM waifus
-LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, c.jp_name as jp_name, w.row_num as image_index, w.url as url
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, c.jp_name as jp_name, w.row_num as image_index, w.normal_url as url
 FROM character c
-LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+LEFT JOIN (SELECT id, character_id, normal_url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
 ON w.character_id = c.id) s
 ON waifus.images_id = s.id
 WHERE waifus.user_id = ?
@@ -386,9 +385,9 @@ def get_waifus(user_id, rarity=None, name_query=None, show_id=None, page_size=25
     if show_id:
         cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite, sc.show_id
 FROM waifus
-LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.mal_url as url
 FROM character c
-LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+LEFT JOIN (SELECT id, character_id, mal_url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
 ON w.character_id = c.id) s
 ON waifus.images_id = s.id
 LEFT JOIN (
@@ -402,9 +401,9 @@ ORDER BY waifus.id;""", (show_id, user_id))
     else:
         cursor.execute("""SELECT en_name, s.image_index, rarity, s.char_id, images_id, waifus.id, s.url, waifus.favorite
 FROM waifus
-LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.url as url
+LEFT JOIN (SELECT w.id as id, w.character_id as char_id, c.en_name as en_name, w.row_num as image_index, w.normal_url as url
 FROM character c
-LEFT JOIN (SELECT id, character_id, url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
+LEFT JOIN (SELECT id, character_id, normal_url, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY id) AS row_num FROM images) w
 ON w.character_id = c.id) s
 ON waifus.images_id = s.id
 WHERE waifus.user_id = ?
@@ -510,7 +509,7 @@ def get_waifu_data_of_user(user_id, waifu_index):
 
     conn, cursor = get_connection()
 
-    cursor.execute("""SELECT en_name, jp_name, character_id, url, waifus.id, rarity, waifus.images_id, waifus.favorite
+    cursor.execute("""SELECT en_name, jp_name, character_id, normal_url, waifus.id, rarity, waifus.images_id, waifus.favorite
 FROM waifus
 LEFT JOIN images i ON waifus.images_id = i.id
 LEFT JOIN character c ON i.character_id = c.id
@@ -991,7 +990,7 @@ def get_character_info(char_id):
     en_name = row[0]
     jp_name = row[1]
 
-    cursor.execute("""SELECT url FROM images WHERE character_id = ?;""", (char_id,))
+    cursor.execute("""SELECT normal_url FROM images WHERE character_id = ?;""", (char_id,))
     rows = cursor.fetchall()
     image_urls = []
     for row in rows:
@@ -1057,7 +1056,7 @@ def upgrade_user_waifu(user_id, waifus_id, amount):
 
 async def update_images():
     conn, cursor = get_connection()
-    cursor.execute("""SELECT id, url, character_id FROM images WHERE normal_url IS NULL;""")
+    cursor.execute("""SELECT id, mal_url, character_id FROM images WHERE normal_url IS NULL;""")
     rows = cursor.fetchall()
     for row in rows:
         cur_id = row[0]
@@ -1071,3 +1070,7 @@ async def update_images():
 
     conn.commit()
     conn.close()
+
+
+# def change_name(char_id, en_name):
+#

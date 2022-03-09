@@ -7,9 +7,9 @@ USER_NOT_FOUND = object()
 NO_LOOKUP_IN_DM = object()
 
 class Command:
-    '''
+    """
     A command available for the bot.
-    '''
+    """
     
     def __init__(self, require_server_admin = False, require_bot_admin = False, only_in_assigned_channel = True, ignore_cooldown = False):
         self.require_server_admin = require_server_admin
@@ -23,11 +23,11 @@ class Command:
     
 
     def set_function(self, function):
-        '''
+        """
         Bind a function to this command.
 
         This also reads the help and usage text from the docstring.
-        '''
+        """
 
         self.function = function
 
@@ -46,9 +46,9 @@ class Command:
     
 
     def check_permissions(self, arguments):
-        '''
+        """
         Check if this command can be run by this user.
-        '''
+        """
 
         if self.require_server_admin and not arguments.is_server_admin:
             return False
@@ -60,9 +60,9 @@ class Command:
 
 
     async def run(self, bot, arguments):
-        '''
+        """
         Run the command with some arguments.
-        '''
+        """
         # Check for cooldown
         if not arguments.is_bot_admin and not self.ignore_cooldown and arguments.is_in_cooldown:
             return
@@ -94,46 +94,46 @@ class Command:
     
 
     async def generic_error(self, arguments):
-        '''
+        """
         Display an error message that does not have any further info about the cause of the error.
-        '''
+        """
         await arguments.message.reply(embed = display.create_embed('Command Failed', 'An unknown error occurred when running that command. Sorry :('))
     
 
     async def permissions_error(self, arguments):
-        '''
+        """
         Display an error message for when a user lacks permission to run a command.
-        '''
+        """
         await arguments.message.reply(embed = display.create_embed('Permission Denied', 'You do not have permission to use that command.'))
 
 
     async def bad_usage_error(self, bot, arguments):
-        '''
+        """
         Display an error message for when a command is passed invalid arguments.
-        '''
+        """
         usage_text = self.usage or 'Bad usage.'
         usage_text = bot.format(usage_text).replace('%COMMAND%', arguments.command)
         await arguments.message.reply(embed = display.create_embed('Command Failed', usage_text))
 
     
     async def user_not_found_error(self, arguments):
-        '''
+        """
         Display an error message for when a command requests information about a user that does not exist.
-        '''
+        """
         await arguments.message.reply(embed = display.create_embed('Lookup Failed', 'Requested user is not in this server.'))
 
     
     async def no_lookup_in_dm_error(self, arguments):
-        '''
+        """
         Display a message alerting users that they cannot request information about other users in DMs.
-        '''
+        """
         await arguments.message.reply(embed = display.create_embed('Lookup Failed', 'You cannot look for users in DMs.'))
 
 
 class CommandArguments:
-    '''
+    """
     The context passed to a command when it is run.
-    '''
+    """
 
     def __init__(self, message, command, arguments_string, is_server_admin, is_bot_admin, is_in_cooldown):
         self.message = message

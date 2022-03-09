@@ -47,9 +47,10 @@ class CharacterImage:
         os.remove(mirror_path)
         os.remove(upside_down_path)
 
-        return cls(new_image_urls[0], new_image_urls[1], new_image_urls[2])
+        return cls(mal_url, new_image_urls[0], new_image_urls[1], new_image_urls[2])
 
-    def __init__(self, normal_url, mirror_url, upside_down_url):
+    def __init__(self, mal_url: str, normal_url: str, mirror_url: str, upside_down_url: str):
+        self.mal_url = mal_url
         self.normal_url = normal_url
         self.mirror_url = mirror_url
         self.upside_down_url = upside_down_url
@@ -161,7 +162,6 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
                     db.add_show_to_character(character_id, show_id)
                     continue
         character_data = await downloadCharacterFromURL(character_url["href"])
-        quit()
         db.insert_character(character_data)
         db.add_show_to_character(character_id, show_id)
 
@@ -204,7 +204,7 @@ async def downloadCharacter(char_id):
     return {"char_id": char_id,
             "en_name": en_name.strip(),
             "jp_name": jp_name.strip() if jp_name else jp_name,
-            "image_urls": image_objects}
+            "images": image_objects}
 
 
 async def getImages(image_page_url):

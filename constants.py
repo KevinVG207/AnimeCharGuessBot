@@ -6,7 +6,7 @@ import bot_token
 
 ENVVAR_PREFIX = 'ACGB_'
 START_TIME = time.time()
-VERIFICATION_URL = "https://8.8.8.8/"
+VERIFICATION_URL = "https://discord.com/"
 
 BOT_OBJECT = None
 CHARACTER_TIMEOUT = 30
