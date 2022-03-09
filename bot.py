@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 
 import aiohttp.client_exceptions
@@ -17,6 +18,7 @@ from drop import Drop
 import name_tools as nt
 from show import Show
 from trade import Trade
+import uma
 import util
 import waifu_filter
 from waifu import Waifu, Character
@@ -81,6 +83,9 @@ class AnimeCharGuessBot(discord.Client):
                 self.resource_channel = await g.fetch_channel(self.resource_channel_id)
 
         print(f"Resource channel: {self.resource_channel.id}")
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(uma.run())
 
 
     async def on_guild_remove(self, guild):
@@ -163,6 +168,13 @@ class AnimeCharGuessBot(discord.Client):
         for admin_id in self.admins:
             admin_user = await self.fetch_user(admin_id)
             await admin_user.send(embed=embed)
+        return
+
+
+    async def send_uma_embed(self, embed):
+        uma_channel = self.get_channel(int(os.environ[f'{constants.ENVVAR_PREFIX}UMA_CHANNEL']))
+        if uma_channel:
+            await uma_channel.send(embed=embed)
         return
 
 

@@ -29,7 +29,7 @@ def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = N
         type = "rich",
         title = title,
         description = desciption,
-        color = constants.EMBED_COLOR,
+        color = color,
         timestamp = datetime.datetime.now()
     )
 

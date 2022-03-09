@@ -1,4 +1,13 @@
 import datetime
+import uma
+import time
+import math
+
+jp_timestamp = uma.convert_to_epoch("2022-03-10 06:27:55")
+local_timestamp = math.floor(time.time())
+print(jp_timestamp, local_timestamp)
+
+quit()
 
 import mal_tools as mal
 import database_tools as db
@@ -19,7 +28,6 @@ for row in rows:
 conn.commit()
 conn.close()
 
-quit()
 
 db.removeUselessWaifus()
 
