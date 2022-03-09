@@ -27,7 +27,7 @@ def get_last_check() -> int:
             line = f.readline().strip()
             if line.isnumeric():
                 return int(line)
-    last_check = math.floor(time.time()) - 86400
+    last_check = math.floor(time.time())
     # last_check = math.floor(time.time()) - 604800
     return last_check
 
