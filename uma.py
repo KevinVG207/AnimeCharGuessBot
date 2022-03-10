@@ -34,7 +34,7 @@ def get_last_check() -> int:
 
 def get_last_news() -> list:
     payload = {
-        "announce_label": 0,
+        "announce_label": 1,  # 0=all, 1=game, 2=campaign(social media stuff), 3=media
         "limit": 10,
         "offset": 0
     }
