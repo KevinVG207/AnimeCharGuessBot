@@ -5,16 +5,18 @@ import re
 import time
 import requests
 import os
-from datetime import datetime
+import datetime
 import pytz
 import constants
 import display
 from discord import Color
 import deepl
+from bs4 import BeautifulSoup
 
 
 UPDATE_LOG = "uma_update.txt"
 TRANSLATOR = deepl.Translator(os.getenv("DEEPL_AUTH_KEY"))
+
 
 def save_last_check():
     with open(UPDATE_LOG, "w") as f:
@@ -43,7 +45,7 @@ def get_last_news() -> list:
 
 
 def convert_to_epoch(jst_time: str) -> int:
-    dt = datetime.strptime(jst_time, "%Y-%m-%d %H:%M:%S")
+    dt = datetime.datetime.strptime(jst_time, "%Y-%m-%d %H:%M:%S")
     tz = pytz.timezone("Japan")
     dt_with_tz = tz.localize(dt)
     return math.floor(dt_with_tz.timestamp())
@@ -58,7 +60,7 @@ def get_article_latest_time(article: dict) -> int:
     return convert_to_epoch(latest_time)
 
 
-def get_new_news() -> list:
+def get_new_news() -> tuple[list, int]:
     last_check = get_last_check()
 
     new_articles = list()
@@ -72,7 +74,7 @@ def get_new_news() -> list:
     new_news = sorted(new_articles, key=lambda x: x[0])
 
     save_last_check()
-    return new_news
+    return new_news, last_check
 
 
 def clean_message(message: str) -> str:
@@ -84,15 +86,92 @@ def clean_message(message: str) -> str:
                   .replace("&gt;", ">"))
 
 
+def make_month_day(text: str) -> tuple[int, int]:
+    text = text[1:-3]
+    month_day = text.split(" ", 1)[0]
+    month, day = month_day.split("/", 1)
+
+    return int(month), int(day)
+
+
+def format_bug_report(message: str) -> str:
+    tz = pytz.timezone("Japan")
+    localized_now = tz.localize(datetime.datetime.utcnow())
+
+    known_bugs = list()
+    fixed_bugs = list()
+
+    first = True
+    before = str()
+
+    current_month_day = tuple()
+    current_date_str = str()
+    current_lines = list()
+
+    in_known = False
+
+    soup = BeautifulSoup(message, "html.parser")
+    for element in soup:
+        if first:
+            first = False
+            before = element.text
+        else:
+            if not element.text:
+                continue
+            elif element.text == "■現在確認している不具合":
+                in_known = True
+            elif element.text == "■修正済みの不具合":
+                in_known = False
+            elif element.text[0] == "【":
+                if current_lines and current_month_day and current_date_str:
+                    if current_month_day == (localized_now.month, localized_now.day):
+                        bug_tuple = (current_date_str, current_lines)
+                        if in_known:
+                            known_bugs.append(bug_tuple)
+                        else:
+                            fixed_bugs.append(bug_tuple)
+                current_month_day = make_month_day(element.text)
+                current_date_str = element.text
+                current_lines = list()
+            else:
+                current_lines.append(element.text)
+    if current_lines:
+        if current_month_day == (localized_now.month, localized_now.day):
+            bug_tuple = (current_date_str, current_lines)
+            if in_known:
+                known_bugs.append(bug_tuple)
+            else:
+                fixed_bugs.append(bug_tuple)
+
+    known_segment = str()
+    fixed_segment = str()
+
+    if known_bugs:
+        known_segment = "\n\n■現在確認している不具合\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
+    if fixed_bugs:
+        fixed_segment = "\n\n■修正済みの不具合\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
+
+    out_message = before + known_segment + fixed_segment
+
+    return out_message
+
+
 async def run():
     while True and constants.BOT_OBJECT:
-        new_news = get_new_news()
+        new_news, last_check = get_new_news()
         for article_tuple in new_news:
             print(f"{time.time()}\tNew Uma News!")
             article = article_tuple[1]
             translated_title = TRANSLATOR.translate_text(article["title"], target_lang="EN-US")
-            raw_message = clean_message(article["message"])[:4000]
-            translated_message = TRANSLATOR.translate_text(raw_message, target_lang="EN-US").text \
+            raw_message = article["message"]
+
+            # Check for special case:
+            if article["title"] == "現在確認している不具合について":
+                # This is a bug report news article!
+                raw_message = format_bug_report(raw_message)
+
+            cleaned_message = clean_message(raw_message)[:4000]
+            translated_message = TRANSLATOR.translate_text(cleaned_message, target_lang="EN-US").text \
                 .replace("[", "\\[") \
                 .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
             if len(translated_message) > 2000:
@@ -107,7 +186,6 @@ async def run():
                 color=Color.from_rgb(105, 193, 12),
                 image=article.get("image"),
                 footer="Uma Musume News",
-                timestamp=datetime.fromtimestamp(article_tuple[0])
+                timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
             ))
-
         await asyncio.sleep(750)
