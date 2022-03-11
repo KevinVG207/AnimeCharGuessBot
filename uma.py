@@ -85,17 +85,21 @@ def clean_message(message: str) -> str:
 
 
 async def run():
-    while True:
+    while True and constants.BOT_OBJECT:
         new_news = get_new_news()
         for article_tuple in new_news:
             print(f"{time.time()}\tNew Uma News!")
             article = article_tuple[1]
             translated_title = TRANSLATOR.translate_text(article["title"], target_lang="EN-US")
             raw_message = clean_message(article["message"])[:4000]
-            translated_message = TRANSLATOR.translate_text(raw_message, target_lang="EN-US").text
+            translated_message = TRANSLATOR.translate_text(raw_message, target_lang="EN-US").text \
+                .replace("[", "\\[") \
+                .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
             if len(translated_message) > 2000:
                 translated_message = translated_message[:1997] + "..."
-            translated_message += f"""\n[Source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
+            if translated_message[-1] != "\n":
+                translated_message += "\n"
+            translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
 
             await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
                 translated_title,
