@@ -64,6 +64,8 @@ class AnimeCharGuessBot(discord.Client):
         self.active_trades = set()
         self.active_drops = dict()
 
+        self.uma_running = False
+
 
     async def on_ready(self):
         """
@@ -174,7 +176,11 @@ class AnimeCharGuessBot(discord.Client):
     async def send_uma_embed(self, embed):
         uma_channel = self.get_channel(int(os.environ[f'{constants.ENVVAR_PREFIX}UMA_CHANNEL']))
         if uma_channel:
-            await uma_channel.send(embed=embed)
+            uma_role = uma_channel.guild.get_role(950481988928823296)  # TODO: Replace this hardcoded id
+            if uma_role:
+                await uma_channel.send(uma_role.mention, embed=embed)
+            else:
+                await uma_channel.send(embed=embed)
         return
 
 

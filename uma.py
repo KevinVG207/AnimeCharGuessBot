@@ -7,6 +7,8 @@ import requests
 import os
 import datetime
 import pytz
+
+import bot_token
 import constants
 import display
 from discord import Color
@@ -15,23 +17,59 @@ from bs4 import BeautifulSoup
 
 
 UPDATE_LOG = "uma_update.txt"
+LAST_ARTICLES = "uma_articles.txt"
+NAMES_FILE = "uma_names.txt"
 TRANSLATOR = deepl.Translator(os.getenv("DEEPL_AUTH_KEY"))
 
 
-def save_last_check():
+def get_uma_names() -> dict:
+    uma_names = dict()
+    if os.path.exists(NAMES_FILE):
+        with open(NAMES_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                jp_name, en_name = line.rstrip().split(";", 1)
+                uma_names[jp_name] = en_name
+    return uma_names
+
+
+def generate_uma_names_file():
+    r = requests.get("https://umamusume.jp/app/wp-json/wp/v2/character?per_page=99&page=1")
+    parsed = r.json()
+
+    with open(NAMES_FILE, "w", encoding="utf-8") as f:
+        for character in parsed:
+            f.write(f"""{character["title"]["rendered"]};\n""")
+
+
+def save_last_check(new_news: list[tuple[int, dict]]):
     with open(UPDATE_LOG, "w") as f:
         f.write(f"{math.floor(time.time())}")
+    if not new_news:
+        os.remove(LAST_ARTICLES)
+    else:
+        with open(LAST_ARTICLES, "w") as f:
+            for article_tuple in new_news:
+                f.write(f"""{article_tuple[1]["announce_id"]}\t{article_tuple[0]}\n""")
 
 
-def get_last_check() -> int:
+def get_last_check() -> tuple[int, dict]:
+    last_check = math.floor(time.time())
+    if bot_token.isDebug():
+        last_check -= 604800
+
     if os.path.exists(UPDATE_LOG):
         with open(UPDATE_LOG, "r") as f:
             line = f.readline().strip()
             if line.isnumeric():
-                return int(line)
-    last_check = math.floor(time.time())
-    # last_check = math.floor(time.time()) - 604800
-    return last_check
+                last_check = int(line)
+
+    last_news = dict()
+    if os.path.exists(LAST_ARTICLES):
+        with open(LAST_ARTICLES, "r") as f:
+            for line in f.readlines():
+                news_id, timestamp = line.rstrip().split("\t", 1)
+                last_news[int(news_id)] = int(timestamp)
+    return last_check, last_news
 
 
 def get_last_news() -> list:
@@ -61,26 +99,29 @@ def get_article_latest_time(article: dict) -> int:
 
 
 def get_new_news() -> tuple[list, int]:
-    last_check = get_last_check()
+    last_check, last_articles = get_last_check()
 
     new_articles = list()
 
     recent_news = get_last_news()
     for article in recent_news:
         article_time = get_article_latest_time(article)
-        if article_time > last_check:
-            new_articles.append((article_time, article))
+        if article_time > last_check - 120:  # Look for articles up to 2 minutes before the last check.
+            if int(article["announce_id"]) in last_articles and article_time <= int(last_articles[article["announce_id"]]):  # If article was found recently, only show it if it has been updated since.
+                pass
+            else:
+                new_articles.append((article_time, article))
 
     new_news = sorted(new_articles, key=lambda x: x[0])
+    if new_news:
+        save_last_check(new_news)
 
-    save_last_check()
     return new_news, last_check
 
 
 def clean_message(message: str) -> str:
     return re.sub(r"<.*?>", "", message
-                  .replace("</div><br>", "</div><br><br>")
-                  .replace("<br>", "\n")
+                  .replace("<br>", "\n\n")
                   .replace("&nbsp;", " ")
                   .replace("&lt;", "<")
                   .replace("&gt;", ">"))
@@ -157,35 +198,50 @@ def format_bug_report(message: str) -> str:
 
 
 async def run():
-    while True and constants.BOT_OBJECT:
-        new_news, last_check = get_new_news()
-        for article_tuple in new_news:
-            print(f"{time.time()}\tNew Uma News!")
-            article = article_tuple[1]
-            translated_title = TRANSLATOR.translate_text(article["title"], target_lang="EN-US")
-            raw_message = article["message"]
+    uma_names = get_uma_names()
+    if not constants.BOT_OBJECT.uma_running:
+        constants.BOT_OBJECT.uma_running = True
+        while True and constants.BOT_OBJECT:
+            new_news, last_check = get_new_news()
+            for article_tuple in new_news:
+                print(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
+                article = article_tuple[1]
 
-            # Check for special case:
-            if article["title"] == "現在確認している不具合について":
-                # This is a bug report news article!
-                raw_message = format_bug_report(raw_message)
+                raw_title = article["title"]
+                raw_message = article["message"]
 
-            cleaned_message = clean_message(raw_message)[:4000]
-            translated_message = TRANSLATOR.translate_text(cleaned_message, target_lang="EN-US").text \
-                .replace("[", "\\[") \
-                .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
-            if len(translated_message) > 2000:
-                translated_message = translated_message[:1997] + "..."
-            if translated_message[-1] != "\n":
-                translated_message += "\n"
-            translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
+                for jp_name, en_name in uma_names.items():
+                    raw_title = raw_title.replace(jp_name, en_name)
+                    raw_message = raw_message.replace(jp_name, en_name)
 
-            await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
-                translated_title,
-                translated_message,
-                color=Color.from_rgb(105, 193, 12),
-                image=article.get("image"),
-                footer="Uma Musume News",
-                timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
-            ))
-        await asyncio.sleep(750)
+                translated_title = TRANSLATOR.translate_text(raw_title, target_lang="EN-US")
+
+                # Check for special case:
+                if article["title"] == "現在確認している不具合について":
+                    # This is a bug report news article!
+                    raw_message = format_bug_report(raw_message)
+
+                cleaned_message = clean_message(raw_message)[:4000]
+                translated_message = TRANSLATOR.translate_text(cleaned_message, target_lang="EN-US").text \
+                    .replace("[", "\\[") \
+                    .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
+                if len(translated_message) > 2000:
+                    translated_message = translated_message[:1997] + "..."
+                if translated_message[-1] != "\n":
+                    translated_message += "\n"
+                translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
+
+                print(translated_message)
+
+                await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
+                    translated_title,
+                    translated_message,
+                    color=Color.from_rgb(105, 193, 12),
+                    image=article.get("image"),
+                    footer="Uma Musume News",
+                    timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
+                ))
+            delta = datetime.timedelta(hours=1)
+            now = datetime.datetime.now()
+            next_hour = (now + delta).replace(microsecond=0, second=0, minute=1)
+            await asyncio.sleep((next_hour - now).seconds)
