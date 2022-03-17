@@ -55,7 +55,7 @@ def save_last_check(new_news: list[tuple[int, dict]]):
 def get_last_check() -> tuple[int, dict]:
     last_check = math.floor(time.time())
     if bot_token.isDebug():
-        last_check -= 604800
+        last_check -= 86400
 
     if os.path.exists(UPDATE_LOG):
         with open(UPDATE_LOG, "r") as f:
@@ -72,13 +72,17 @@ def get_last_check() -> tuple[int, dict]:
     return last_check, last_news
 
 
-def get_last_news() -> list:
+def get_latest_news() -> list:
     payload = {
         "announce_label": 1,  # 0=all, 1=game, 2=campaign(social media stuff), 3=media
         "limit": 10,
         "offset": 0
     }
+    if bot_token.isDebug():
+        print(payload)
     r = requests.post("https://umamusume.jp/api/ajax/pr_info_index?format=json", json=payload)
+    if bot_token.isDebug():
+        print(r.json())
     return r.json()["information_list"]
 
 
@@ -99,11 +103,13 @@ def get_article_latest_time(article: dict) -> int:
 
 
 def get_new_news() -> tuple[list, int]:
+    if bot_token.isDebug():
+        print("In get news")
     last_check, last_articles = get_last_check()
 
     new_articles = list()
 
-    recent_news = get_last_news()
+    recent_news = get_latest_news()
     for article in recent_news:
         article_time = get_article_latest_time(article)
         if article_time > last_check - 120:  # Look for articles up to 2 minutes before the last check.
@@ -121,6 +127,9 @@ def get_new_news() -> tuple[list, int]:
 
 def clean_message(message: str) -> str:
     return re.sub(r"<.*?>", "", message
+                  .replace("<h2", "**<h2")
+                  .replace("</h2>", "**<br>")
+                  .replace("<br><br>", "<br>")
                   .replace("<br>", "\n\n")
                   .replace("&nbsp;", " ")
                   .replace("&lt;", "<")
@@ -188,21 +197,35 @@ def format_bug_report(message: str) -> str:
     fixed_segment = str()
 
     if known_bugs:
-        known_segment = "\n\n■現在確認している不具合\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
+        known_segment = "\n\n**■現在確認している不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
     if fixed_bugs:
-        fixed_segment = "\n\n■修正済みの不具合\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
+        fixed_segment = "\n\n**■修正済みの不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
 
     out_message = before + known_segment + fixed_segment
 
     return out_message
 
 
+def get_first_img(message: str) -> str:
+    soup = BeautifulSoup(message, "html.parser")
+    img = soup.find('img')
+    if img:
+        return img["src"]
+    return str()
+
+
 async def run():
+    print("Started uma process")
     uma_names = get_uma_names()
     if not constants.BOT_OBJECT.uma_running:
         constants.BOT_OBJECT.uma_running = True
         while True and constants.BOT_OBJECT:
+            if bot_token.isDebug():
+                print("In while")
             new_news, last_check = get_new_news()
+            if bot_token.isDebug():
+                print(new_news)
+                print("After get news")
             for article_tuple in new_news:
                 print(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
                 article = article_tuple[1]
@@ -210,11 +233,22 @@ async def run():
                 raw_title = article["title"]
                 raw_message = article["message"]
 
+                # Deal with image
+                image = None
+                if article.get("image"):
+                    image = article["image"]
+                else:
+                    # Try getting the image from the article message.
+                    image_from_message = get_first_img(raw_message)
+                    if image_from_message:
+                        image = image_from_message
+
+
                 for jp_name, en_name in uma_names.items():
                     raw_title = raw_title.replace(jp_name, en_name)
                     raw_message = raw_message.replace(jp_name, en_name)
 
-                translated_title = TRANSLATOR.translate_text(raw_title, target_lang="EN-US")
+                translated_title = clean_message(TRANSLATOR.translate_text(raw_title, target_lang="EN-US").text)
 
                 # Check for special case:
                 if article["title"] == "現在確認している不具合について":
@@ -231,13 +265,11 @@ async def run():
                     translated_message += "\n"
                 translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
 
-                print(translated_message)
-
                 await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
                     translated_title,
                     translated_message,
                     color=Color.from_rgb(105, 193, 12),
-                    image=article.get("image"),
+                    image=image,
                     footer="Uma Musume News",
                     timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
                 ))
