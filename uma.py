@@ -54,8 +54,6 @@ def save_last_check(new_news: list[tuple[int, dict]]):
 
 def get_last_check() -> tuple[int, dict]:
     last_check = math.floor(time.time())
-    if bot_token.isDebug():
-        last_check -= 86400
 
     if os.path.exists(UPDATE_LOG):
         with open(UPDATE_LOG, "r") as f:
@@ -69,6 +67,9 @@ def get_last_check() -> tuple[int, dict]:
             for line in f.readlines():
                 news_id, timestamp = line.rstrip().split("\t", 1)
                 last_news[int(news_id)] = int(timestamp)
+    
+    if bot_token.isDebug():
+        last_check -= 86400
     return last_check, last_news
 
 
@@ -184,7 +185,7 @@ def format_bug_report(message: str) -> str:
                 current_date_str = element.text
                 current_lines = list()
             else:
-                current_lines.append(element.text)
+                current_lines.append(element.get_text(separator="\n"))
     if current_lines:
         if current_month_day == (localized_now.month, localized_now.day):
             bug_tuple = (current_date_str, current_lines)
@@ -196,10 +197,14 @@ def format_bug_report(message: str) -> str:
     known_segment = str()
     fixed_segment = str()
 
+    print(f"Known bugs: {len(known_bugs)}, fixed bugs: {len(fixed_bugs)}")
+
     if known_bugs:
         known_segment = "\n\n**■現在確認している不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
     if fixed_bugs:
         fixed_segment = "\n\n**■修正済みの不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
+
+    print(fixed_segment)
 
     out_message = before + known_segment + fixed_segment
 
@@ -253,6 +258,7 @@ async def run():
                 # Check for special case:
                 if article["title"] == "現在確認している不具合について":
                     # This is a bug report news article!
+                    print("Bug report found.")
                     raw_message = format_bug_report(raw_message)
 
                 cleaned_message = clean_message(raw_message)[:4000]

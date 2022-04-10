@@ -673,9 +673,12 @@ def get_history(guild_id):
 
 
 def update_history(guild_id, history, waifu_data):
-    if len(history) > constants.HISTORY_SIZE:
-        history = history[-constants.HISTORY_SIZE:]
-    history.pop(0)
+    if not history:
+        history = list()
+    else:
+        if len(history) > constants.HISTORY_SIZE:
+            history = history[-constants.HISTORY_SIZE:]
+        history.pop(0)
     history.append(waifu_data["id"])
     history_joined = ";".join([str(hist_element) for hist_element in history])
     conn, cursor = get_connection()
