@@ -199,7 +199,8 @@ class AnimeCharGuessBot(discord.Client):
         Get the chance per message of a random drop happening in a guild.
         """
 
-        return 10 / max(100, guild.approximate_presence_count)
+        # return 10 / max(100, (guild.member_count * 0.75))
+        return 10.0 / max(100, (guild.member_count * 0.25))
 
 
     def is_bot_admin(self, user_id):
