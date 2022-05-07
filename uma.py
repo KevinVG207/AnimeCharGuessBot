@@ -222,7 +222,7 @@ def get_first_img(message: str) -> str:
 async def run():
     print("Started uma process")
     uma_names = get_uma_names()
-    if not constants.BOT_OBJECT.uma_running:
+    if not constants.BOT_OBJECT.uma_running and not bot_token.isDebug():
         constants.BOT_OBJECT.uma_running = True
         while True and constants.BOT_OBJECT:
             if bot_token.isDebug():
@@ -283,3 +283,73 @@ async def run():
             now = datetime.datetime.now()
             next_hour = (now + delta).replace(microsecond=0, second=0, minute=1)
             await asyncio.sleep((next_hour - now).seconds)
+
+async def get_url_token():
+    """
+    Gets the url token from the gametora website.
+    """
+    r = requests.get("https://gametora.com/umamusume")
+    match = re.search(r'_next\/static\/[a-zA-Z0-9]*\/_buildManifest', r.text)
+    if match:
+        return match.group().rsplit('/', 2)[-2]
+    return str()
+
+
+async def get_gacha_data(url_token):
+    return requests.get(f"https://gametora.com/_next/data/{url_token}/umamusume/gacha.json").json()
+
+
+async def get_main_data(url_token):
+    return requests.get(f"https://gametora.com/_next/data/{url_token}/umamusume.json").json()
+
+
+async def create_banner_embed(active_banner, gacha_data, support=False):
+    banner_image = f"https://gametora.com/images/umamusume/gacha/img_bnr_gacha_{active_banner['id']}.png"
+    banner_thumb = None
+    banner_end = active_banner['end']
+    banner_card_data = dict()
+    char_ids = list()
+    for pickup in active_banner['pickups']:
+        char_ids.append(pickup[0])
+    
+    data_key = 'charCardData' if not support else 'supportCardData'
+    for card_data in gacha_data['pageProps'][data_key]:
+        if card_data['id'] in char_ids:
+            banner_card_data[card_data['id']] = card_data
+    embed_title = "Current Character Banner" if not support else "Current Support Banner"
+    embed_description = f"Banner pickups:\n"
+    description_items = list()
+    for char_id, card_data in banner_card_data.items():
+        if not banner_thumb:
+            if not support:
+                banner_thumb = f"https://gametora.com/images/umamusume/characters/thumb/chara_stand_{str(char_id)[:-2]}_{char_id}.png"
+            else:
+                banner_thumb = f"https://gametora.com/images/umamusume/supports/support_card_s_{char_id}.png"
+        if not support:
+            description_items.append(f"**[{card_data['name']}](https://gametora.com/umamusume/characters/{card_data['url']})**")
+        else:
+            description_items.append(f"**[{card_data['name']}](https://gametora.com/umamusume/supports/{card_data['url']})**")
+    
+    embed_description += "\n".join(description_items)
+    embed_description += f"\nBanner ends <t:{banner_end}:R>."
+
+    return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image, thumbnail=banner_thumb)
+
+
+async def create_gacha_embeds():
+    url_token = await get_url_token()
+    if not url_token:
+        return None
+    gacha_data = await get_gacha_data(url_token)
+    if not gacha_data:
+        return None
+
+    char_banner_embeds = list()
+
+    for active_banner in gacha_data['pageProps']['currentCharBanners']:
+        char_banner_embeds.append(await create_banner_embed(active_banner, gacha_data, support=False))
+    
+    for active_banner in gacha_data['pageProps']['currentSupportBanners']:
+        char_banner_embeds.append(await create_banner_embed(active_banner, gacha_data, support=True))
+
+    return char_banner_embeds

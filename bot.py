@@ -1717,6 +1717,22 @@ class AnimeCharGuessBot(discord.Client):
         title = f"{user.display_name}'s Waifus"
 
         await display.page(self, args, waifus, title, page)
+    
+    @command('uma.gacha', only_in_assigned_channel = False)
+    async def command_uma_gacha(self, args):
+        """
+        View the currently active Uma Musume gacha banners.
+        """
+        gacha_embeds = await uma.create_gacha_embeds()
+        if gacha_embeds:
+            for embed in gacha_embeds:
+                await args.message.reply(embed = embed)
+        else:
+            await args.message.reply(embed=display.create_embed(
+                'No Uma Musume Gacha',
+                'No Uma Musume Gacha could be found.'
+            ))
+        return
 
 
 AnimeCharGuessBot.command_map = _command_map
