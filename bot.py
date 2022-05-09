@@ -377,7 +377,7 @@ class AnimeCharGuessBot(discord.Client):
         return [attachment.url for attachment in message.attachments]
 
 
-    @command('a.reboot', require_bot_admin=True)
+    @command('a.reboot', require_bot_admin=True, only_in_assigned_channel=False)
     async def command_admin_reboot(self, args):
         """
         Reboots the bot. (Bot admin only)
