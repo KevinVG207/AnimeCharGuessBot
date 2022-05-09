@@ -289,7 +289,7 @@ async def get_url_token():
     Gets the url token from the gametora website.
     """
     r = requests.get("https://gametora.com/umamusume")
-    match = re.search(r'_next\/static\/[a-zA-Z0-9]*\/_buildManifest', r.text)
+    match = re.search(r"_next\/static\/[^\/]*\/_buildManifest", r.text)
     if match:
         return match.group().rsplit('/', 2)[-2]
     return str()
@@ -338,6 +338,8 @@ async def create_banner_embed(active_banner, gacha_data, support=False):
 
 async def create_gacha_embeds():
     url_token = await get_url_token()
+    if bot_token.isDebug():
+        print(f"URL token: {url_token}")
     if not url_token:
         return None
     gacha_data = await get_gacha_data(url_token)
