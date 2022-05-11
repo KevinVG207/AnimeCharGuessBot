@@ -1,6 +1,14 @@
 import uma
+from bs4 import BeautifulSoup
 
-uma.generate_uma_names_file()
+articles = uma.get_latest_news()
+for article in articles:
+    print("="*20)
+    print(article["title"])
+    soup = BeautifulSoup(article["message"], "html.parser")
+    img = soup.find('img')
+    if img:
+        print(img["src"])
 
 quit()
 
