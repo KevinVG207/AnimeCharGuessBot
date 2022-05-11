@@ -1121,7 +1121,7 @@ class AnimeCharGuessBot(discord.Client):
         
 
     @command('search')
-    async def command_search(self, args):
+    async def command_search(self, args, ambiguous_flag = False):
         """
         Find a series.
 
@@ -1146,20 +1146,26 @@ class AnimeCharGuessBot(discord.Client):
         series_list = db.get_shows_like(query)
 
         if series_list:
+            title = 'Search Results'
             lines = []
+
+            if ambiguous_flag:
+                title = ':warning: Ambiguous Show Title'
+                lines.append('Try one of these show IDs:')
 
             for series in series_list:
                 lines.append(f'``{series["id"]}`` **{series["jp_title"]}** ({"Anime" if not series["is_manga"] else "Manga"})')
 
             await args.message.reply(embed = display.create_embed(
-                'Search Results',
+                title,
                 '\n'.join(lines)
             ))
 
         else:
+            lines.append('No results.')
             await args.message.reply(embed = display.create_embed(
-                'Search Results',
-                'No results.'
+                title,
+                '\n'.join(lines)
             ))
 
     
@@ -1192,10 +1198,8 @@ class AnimeCharGuessBot(discord.Client):
                 show_id = series_list[0]['id']
 
             elif len(series_list) > 1:
-                await args.message.reply(embed = display.create_embed(
-                    'Ambiguous Search',
-                    'There are multiple series with that name. Try using the series id instead.'
-                ))
+                # Ambiguous show: There are multiple series with that name.
+                await self.command_search(args, ambiguous_flag=True)
                 return
 
         show = Show.from_id(show_id)
