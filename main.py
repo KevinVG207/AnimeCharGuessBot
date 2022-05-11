@@ -1,4 +1,10 @@
 #!/usr/bin/python3
+import bot_token
+if bot_token.isDebug():
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("Debug mode")
+
 import asyncio
 import os
 

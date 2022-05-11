@@ -20,17 +20,20 @@ def rarity_string(rarity):
     return RARITY_STRINGS[rarity]
 
 
-def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = None, image = None, footer = None):
+def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = None, image = None, footer = None, timestamp = None):
     """
     Creates a Discord embed containing text, and optionally other properties.
     """
+
+    if timestamp is None:
+        timestamp = datetime.datetime.now()
 
     embed = discord.Embed(
         type = "rich",
         title = title,
         description = desciption,
-        color = constants.EMBED_COLOR,
-        timestamp = datetime.datetime.now()
+        color = color,
+        timestamp = timestamp
     )
 
     if thumbnail is not None:

@@ -1,4 +1,16 @@
-import datetime
+import uma
+from bs4 import BeautifulSoup
+
+articles = uma.get_latest_news()
+for article in articles:
+    print("="*20)
+    print(article["title"])
+    soup = BeautifulSoup(article["message"], "html.parser")
+    img = soup.find('img')
+    if img:
+        print(img["src"])
+
+quit()
 
 import mal_tools as mal
 import database_tools as db
@@ -19,7 +31,6 @@ for row in rows:
 conn.commit()
 conn.close()
 
-quit()
 
 db.removeUselessWaifus()
 

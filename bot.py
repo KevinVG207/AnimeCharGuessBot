@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 
 import aiohttp.client_exceptions
@@ -17,6 +18,7 @@ from drop import Drop
 import name_tools as nt
 from show import Show
 from trade import Trade
+import uma
 import util
 import waifu_filter
 from waifu import Waifu, Character
@@ -62,6 +64,8 @@ class AnimeCharGuessBot(discord.Client):
         self.active_trades = set()
         self.active_drops = dict()
 
+        self.uma_running = False
+
 
     async def on_ready(self):
         """
@@ -81,6 +85,9 @@ class AnimeCharGuessBot(discord.Client):
                 self.resource_channel = await g.fetch_channel(self.resource_channel_id)
 
         print(f"Resource channel: {self.resource_channel.id}")
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(uma.run())
 
 
     async def on_guild_remove(self, guild):
@@ -166,6 +173,17 @@ class AnimeCharGuessBot(discord.Client):
         return
 
 
+    async def send_uma_embed(self, embed):
+        uma_channel = self.get_channel(int(os.environ[f'{constants.ENVVAR_PREFIX}UMA_CHANNEL']))
+        if uma_channel:
+            uma_role = uma_channel.guild.get_role(950481988928823296)  # TODO: Replace this hardcoded id
+            if uma_role:
+                await uma_channel.send(uma_role.mention, embed=embed)
+            else:
+                await uma_channel.send(embed=embed)
+        return
+
+
     def format(self, message):
         """
         Formats a string with constants defined by the bot. (And also the next daily reset.)
@@ -181,7 +199,8 @@ class AnimeCharGuessBot(discord.Client):
         Get the chance per message of a random drop happening in a guild.
         """
 
-        return 10 / max(100, guild.member_count)
+        # return 10 / max(100, (guild.member_count * 0.75))
+        return 10.0 / max(100, (guild.member_count * 0.25))
 
 
     def is_bot_admin(self, user_id):
@@ -358,7 +377,7 @@ class AnimeCharGuessBot(discord.Client):
         return [attachment.url for attachment in message.attachments]
 
 
-    @command('a.reboot', require_bot_admin=True)
+    @command('a.reboot', require_bot_admin=True, only_in_assigned_channel=False)
     async def command_admin_reboot(self, args):
         """
         Reboots the bot. (Bot admin only)
@@ -1698,6 +1717,22 @@ class AnimeCharGuessBot(discord.Client):
         title = f"{user.display_name}'s Waifus"
 
         await display.page(self, args, waifus, title, page)
+    
+    @command('uma.gacha', only_in_assigned_channel = False)
+    async def command_uma_gacha(self, args):
+        """
+        View the currently active Uma Musume gacha banners.
+        """
+        gacha_embeds = await uma.create_gacha_embeds()
+        if gacha_embeds:
+            for embed in gacha_embeds:
+                await args.message.reply(embed = embed)
+        else:
+            await args.message.reply(embed=display.create_embed(
+                'No Uma Musume Gacha',
+                'No Uma Musume Gacha could be found.'
+            ))
+        return
 
 
 AnimeCharGuessBot.command_map = _command_map
