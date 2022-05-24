@@ -1639,12 +1639,12 @@ class AnimeCharGuessBot(discord.Client):
         Usage:
         ``%PREFIX%%COMMAND%
           [user]
-          [(-n | -name) <character name (spaces must be quoted)>]
-          [(-s | -series) <series id>]
-          [(-sn | -series-name) <series name (spaces must be quoted)>]
-          [(-r | -rarity) <number>]
-          [(-f | -fav | -favorite)]
-          [(-p | -page) <page number>]``
+          [(-n or -name) <character name (use quotes around name if it has spaces)>]
+          [(-s or -series) <series id>]
+          [(-sn or -series-name) <series name (use quotes around name if it has spaces)>]
+          [(-r or -rarity) <number>]
+          [(-f or -fav or -favorite)]
+          [(-p or -page) <page number>]``
         """
 
         arg_list = shlex.split(args.arguments_string)

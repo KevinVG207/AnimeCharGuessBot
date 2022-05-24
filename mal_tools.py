@@ -221,7 +221,12 @@ async def getImages(image_page_url):
     # Remove duplicates
     image_urls = list(dict.fromkeys(image_urls))
 
-    return [await CharacterImage.create(image_url) for image_url in image_urls]
+    image_objects = list()
+    for image_url in image_urls:
+        await asyncio.sleep(30)
+        image_objects.append(await CharacterImage.create(image_url))
+
+    return image_objects
 
 
 async def run_queue(show_queue: ShowQueue):
