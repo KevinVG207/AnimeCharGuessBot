@@ -173,11 +173,11 @@ class AnimeCharGuessBot(discord.Client):
         return
 
 
-    async def send_uma_embed(self, embed):
+    async def send_uma_embed(self, embed, do_ping=False):
         uma_channel = self.get_channel(int(os.environ[f'{constants.ENVVAR_PREFIX}UMA_CHANNEL']))
         if uma_channel:
             uma_role = uma_channel.guild.get_role(950481988928823296)  # TODO: Replace this hardcoded id
-            if uma_role:
+            if uma_role and do_ping:
                 await uma_channel.send(uma_role.mention, embed=embed)
             else:
                 await uma_channel.send(embed=embed)

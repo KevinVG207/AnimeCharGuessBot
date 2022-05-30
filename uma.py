@@ -7,6 +7,7 @@ import requests
 import os
 import datetime
 import pytz
+import json
 
 import bot_token
 import constants
@@ -22,14 +23,12 @@ NAMES_FILE = "uma_names.txt"
 TRANSLATOR = deepl.Translator(os.getenv("DEEPL_AUTH_KEY"))
 
 
-def get_uma_names() -> dict:
-    uma_names = dict()
-    if os.path.exists(NAMES_FILE):
-        with open(NAMES_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                jp_name, en_name = line.rstrip().split(";", 1)
-                uma_names[jp_name] = en_name
-    return uma_names
+UMA_NAMES = dict()
+if os.path.exists(NAMES_FILE):
+    with open(NAMES_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            jp_name, en_name = line.rstrip().split(";", 1)
+            UMA_NAMES[jp_name] = en_name
 
 
 def generate_uma_names_file():
@@ -82,13 +81,27 @@ def get_latest_news() -> list:
     if bot_token.isDebug():
         print(payload)
     r = requests.post("https://umamusume.jp/api/ajax/pr_info_index?format=json", json=payload)
-    if bot_token.isDebug():
-        print(r.json())
+    # if bot_token.isDebug():
+    #     print(r.json())
     return r.json()["information_list"]
 
 
 def convert_to_epoch(jst_time: str) -> int:
     dt = datetime.datetime.strptime(jst_time, "%Y-%m-%d %H:%M:%S")
+    tz = pytz.timezone("Japan")
+    dt_with_tz = tz.localize(dt)
+    return math.floor(dt_with_tz.timestamp())
+
+
+def short_date_to_epoch(date: str) -> int:
+    month_day, hours_minutes = date.split(" ")
+    month, day = month_day.split("/")
+    hours, minutes = hours_minutes.split(":")
+    current_month = datetime.datetime.now().month
+    year = datetime.datetime.now().year
+    if current_month == 12 and month == "1":
+        year = year + 1
+    dt = datetime.datetime(year, int(month), int(day), int(hours), int(minutes))
     tz = pytz.timezone("Japan")
     dt_with_tz = tz.localize(dt)
     return math.floor(dt_with_tz.timestamp())
@@ -219,24 +232,100 @@ def get_first_img(message: str) -> str:
     return str()
 
 
+def replace_names(string: str, prefix='') -> str:
+    for jp_name, en_name in UMA_NAMES.items():
+        string = string.replace(jp_name, prefix + en_name)
+    return string
+
+
+def save_current_gacha_info(gacha_time_window, trainable, trainable_image, support, support_image):
+    print("Updating gacha info:")
+    print(gacha_time_window)
+    print(trainable)
+    print(trainable_image)
+    print(support)
+    print(support_image)
+    with open("uma_gacha_info.json", "w", encoding='utf-8') as f:
+        json.dump({
+            "gacha_time_window": gacha_time_window,
+            "trainable": trainable,
+            "trainable_image": trainable_image,
+            "support": support,
+            "support_image": support_image}, f, ensure_ascii=False)
+
+
+def load_current_gacha_info():
+    if os.path.exists("uma_gacha_info.json"):
+        with open("uma_gacha_info.json", "r", encoding='utf-8') as f:
+            return json.load(f)
+    return dict()
+
+
+def update_gacha_info(raw_message):
+    soup = BeautifulSoup(raw_message, "html.parser")
+
+    gacha_time_window = list()
+    in_new_trainable = False
+    trainable = []
+    trainable_image = str()
+    in_new_support = False
+    support = []
+    support_image = str()
+    elements_list = list(soup)
+    for i, element in enumerate(elements_list):
+        if not element.text:
+            continue
+        if element.text == "ピックアップガチャ開催期間":
+            time_elements = elements_list[i + 1].text.split(" ～ ")
+            for time_element in time_elements:
+                gacha_time_window.append(short_date_to_epoch(time_element))
+
+        if "新登場の育成ウマ娘（ピックアップ対象）" in element.text:
+            trainable_image = elements_list[i - 1].find('img')['src']
+            in_new_trainable = True
+            continue
+        if "新登場のサポートカード（ピックアップ対象）" in element.text:
+            support_image = elements_list[i - 1].find('img')['src']
+            in_new_support = True
+            continue
+        
+        if in_new_trainable:
+            if not element.text.startswith("★"):
+                in_new_trainable = False
+                continue
+            trainable.append(replace_names(element.text, prefix=" "))
+            continue
+        if in_new_support:
+            if not element.text.startswith("・"):
+                in_new_support = False
+                break
+            support.append(replace_names(element.text[1:], prefix=" "))
+            continue
+
+    save_current_gacha_info(gacha_time_window, trainable, trainable_image, support, support_image)
+
+
 async def run():
     print("Started uma process")
-    uma_names = get_uma_names()
-    if not constants.BOT_OBJECT.uma_running and not bot_token.isDebug():
+    if not constants.BOT_OBJECT.uma_running:
         constants.BOT_OBJECT.uma_running = True
         while True and constants.BOT_OBJECT:
-            if bot_token.isDebug():
-                print("In while")
             new_news, last_check = get_new_news()
-            if bot_token.isDebug():
-                print(new_news)
-                print("After get news")
+            
+            do_ping = True
             for article_tuple in new_news:
                 print(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
                 article = article_tuple[1]
 
                 raw_title = article["title"]
                 raw_message = article["message"]
+
+                if raw_title.endswith("ピックアップガチャ開催！"):
+                    # New gacha
+                    update_gacha_info(raw_message)
+
+                if bot_token.isDebug():
+                    continue
 
                 # Deal with image
                 image = None
@@ -248,10 +337,8 @@ async def run():
                     if image_from_message:
                         image = image_from_message
 
-
-                for jp_name, en_name in uma_names.items():
-                    raw_title = raw_title.replace(jp_name, en_name)
-                    raw_message = raw_message.replace(jp_name, en_name)
+                raw_title = replace_names(raw_title)
+                raw_message = replace_names(raw_message)
 
                 translated_title = clean_message(TRANSLATOR.translate_text(raw_title, target_lang="EN-US").text)
 
@@ -278,7 +365,8 @@ async def run():
                     image=image,
                     footer="Uma Musume News",
                     timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
-                ))
+                ), do_ping)
+                do_ping = False
             delta = datetime.timedelta(hours=1)
             now = datetime.datetime.now()
             next_hour = (now + delta).replace(microsecond=0, second=0, minute=1)
@@ -303,7 +391,7 @@ async def get_main_data(url_token):
     return requests.get(f"https://gametora.com/_next/data/{url_token}/umamusume.json").json()
 
 
-async def create_banner_embed(active_banner, gacha_data, support=False):
+async def create_banner_embed_old(active_banner, gacha_data, support=False):
     banner_image = f"https://gametora.com/images/umamusume/gacha/img_bnr_gacha_{active_banner['id']}.png"
     banner_thumb = None
     banner_end = active_banner['end']
@@ -335,23 +423,35 @@ async def create_banner_embed(active_banner, gacha_data, support=False):
 
     return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image, thumbnail=banner_thumb)
 
+def create_banner_embed(gacha_info, support=False):
+    gacha_time_window = gacha_info['gacha_time_window']
+    if support:
+        embed_title = "Current Support Card Banner"
+        banner_image = gacha_info['support_image']
+        pickups = gacha_info['support']
+    else:
+        embed_title = "Current Character Banner"
+        banner_image = gacha_info['trainable_image']
+        pickups = gacha_info['trainable']
+    embed_description = f"Banner pickups:\n"
+    for character in pickups:
+        embed_description += f"**{character}**\n"
+    
+    embed_description += f"\nBanner ends <t:{gacha_time_window[1]}:R>."
+
+    return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image)
+    
+
 
 async def create_gacha_embeds():
-    url_token = await get_url_token()
-    if bot_token.isDebug():
-        print(f"URL token: {url_token}")
-    if not url_token:
-        return None
-    gacha_data = await get_gacha_data(url_token)
-    if not gacha_data:
+    gacha_info = load_current_gacha_info()
+    if not gacha_info:
         return None
 
     char_banner_embeds = list()
-
-    for active_banner in gacha_data['pageProps']['currentCharBanners']:
-        char_banner_embeds.append(await create_banner_embed(active_banner, gacha_data, support=False))
-    
-    for active_banner in gacha_data['pageProps']['currentSupportBanners']:
-        char_banner_embeds.append(await create_banner_embed(active_banner, gacha_data, support=True))
+    if gacha_info['trainable']:
+        char_banner_embeds.append(create_banner_embed(gacha_info))
+    if gacha_info['support']:
+        char_banner_embeds.append(create_banner_embed(gacha_info, support=True))    
 
     return char_banner_embeds
