@@ -1,6 +1,5 @@
 import discord
 import time
-import bot
 
 # Constants used by the bot in various places.
 import bot_token
