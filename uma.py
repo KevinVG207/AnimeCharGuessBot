@@ -312,7 +312,7 @@ async def run():
         while True and constants.BOT_OBJECT:
             new_news, last_check = get_new_news()
             
-            do_ping = True
+            do_ping = False
             for article_tuple in new_news:
                 print(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
                 article = article_tuple[1]
