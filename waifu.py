@@ -60,6 +60,13 @@ class Character:
 
     def __eq__(self, other):
         return type(self) == type(other) and self.character_id == other.character_id
+    
+
+    def __str__(self):
+        text = f'``{self.character_id}`` **{self.en_name}** | {self.image_count} image'
+        if self.image_count != 1:
+            text += 's'
+        return text
 
     
     def source_string(self):

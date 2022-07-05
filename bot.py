@@ -1210,18 +1210,11 @@ class AnimeCharGuessBot(discord.Client):
                 'Show not found.'
             ))
             return
+        
+        title = show.name
+        error = "Show has no characters."
 
-        lines = []
-
-        for character in show.characters:
-            lines.append(f'``{character.character_id}`` **{character.en_name}** | {character.image_count} image')
-            if character.image_count != 1:
-                lines[-1] += 's'
-
-        await args.message.reply(embed = display.create_embed(
-            show.name,
-            '\n'.join(lines)
-        ))
+        await display.page(self, args, show.characters, title, 0, constants.SHOW_PAGE_SIZE, constants.SHOW_TIMEOUT, error)
 
 
     @command('trade')
@@ -1719,8 +1712,9 @@ class AnimeCharGuessBot(discord.Client):
             return
 
         title = f"{user.display_name}'s Waifus"
+        error = "There are no waifus here!"
 
-        await display.page(self, args, waifus, title, page)
+        await display.page(self, args, waifus, title, page, constants.PROFILE_PAGE_SIZE, constants.PROFILE_TIMEOUT, error)
     
     @command('uma.gacha', only_in_assigned_channel = False)
     async def command_uma_gacha(self, args):
