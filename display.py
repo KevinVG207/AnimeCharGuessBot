@@ -48,20 +48,22 @@ def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = N
     return embed
 
 
-async def page(bot, args, waifus, title, page_no = None):
+async def page(bot, args, elements, title, page_no = None, page_size = 25, timeout = 30, error_message = None):
     """
-    Creates a paginated display of a list of waifus.
+    Creates a paginated display of a list of elements. The elements will be converted into strings.
     Paging is controlled by Discord buttons, and is locked if too much time passes since the last use.
     """
+    if not error_message:
+        error_message = "There is nothing to show."
 
-    if not waifus:
+    if not elements:
         await args.message.reply(embed = create_embed(
             title,
-            "There are no waifus here!"
+            error_message
         ))
         return
     
-    pages = 1 + (len(waifus) - 1) // constants.PROFILE_PAGE_SIZE
+    pages = 1 + (len(elements) - 1) // page_size
 
     page_no = (
         0 if page_no is None
@@ -75,8 +77,8 @@ async def page(bot, args, waifus, title, page_no = None):
     for i in range(pages):
         lines = []
 
-        for waifu in waifus[i * constants.PROFILE_PAGE_SIZE : (i + 1) * constants.PROFILE_PAGE_SIZE]:
-            lines.append(str(waifu))
+        for element in elements[i * page_size : (i + 1) * page_size]:
+            lines.append(str(element))
 
         page_texts.append('\n'.join(lines))
 
@@ -101,7 +103,7 @@ async def page(bot, args, waifus, title, page_no = None):
         prev_button.callback = prev_cb
         next_button.callback = next_cb
 
-        view = discord.ui.View(timeout = constants.PROFILE_TIMEOUT)
+        view = discord.ui.View(timeout = timeout)
         view.add_item(prev_button)
         view.add_item(next_button)
 
@@ -110,7 +112,7 @@ async def page(bot, args, waifus, title, page_no = None):
         try:
             while True:
                 # Wait on input from buttons.
-                movement = await asyncio.wait_for(button_queue.get(), constants.PROFILE_TIMEOUT)
+                movement = await asyncio.wait_for(button_queue.get(), timeout)
 
                 page_no += movement
                 page_no %= pages
