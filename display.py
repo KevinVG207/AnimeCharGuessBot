@@ -20,7 +20,7 @@ def rarity_string(rarity):
     return RARITY_STRINGS[rarity]
 
 
-def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = None, image = None, footer = None, timestamp = None):
+def create_embed(title, description, color = constants.EMBED_COLOR, thumbnail = None, image = None, footer = None, timestamp = None):
     """
     Creates a Discord embed containing text, and optionally other properties.
     """
@@ -28,10 +28,13 @@ def create_embed(title, desciption, color = constants.EMBED_COLOR, thumbnail = N
     if timestamp is None:
         timestamp = datetime.datetime.now()
 
+    if len(description) > 4096:
+        return create_embed("Embed Length Error", "The embed text is too long to display. Please contact the bot owner.", color=discord.Color.red())
+
     embed = discord.Embed(
         type = "rich",
         title = title,
-        description = desciption,
+        description = description,
         color = color,
         timestamp = timestamp
     )
