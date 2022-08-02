@@ -88,3 +88,5 @@
 シンボリクリスエス;Symboli Kris S
 タニノギムレット;Tanino Gimlet
 コパノリッキー;Copano Rickey
+ホッコータルマエ;Hokko Tarumae
+ワンダーアキュート;Wonder Acute
