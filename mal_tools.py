@@ -162,7 +162,7 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
                     db.add_show_to_character(character_id, show_id)
                     continue
         character_data = await downloadCharacterFromURL(character_url["href"])
-        db.insert_character(character_data)
+        db.insert_character(character_data, overwrite=overwrite)
         db.add_show_to_character(character_id, show_id)
 
     await asyncio.sleep(20)
@@ -231,5 +231,5 @@ async def getImages(image_page_url):
 
 async def run_queue(show_queue: ShowQueue):
     while show_queue.has_next():
-        await downloadInsertShowCharacters(show_queue.get_url())
+        await downloadInsertShowCharacters(show_queue.get_url(), overwrite=True)
     show_queue.running = False

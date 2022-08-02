@@ -38,14 +38,16 @@ def bulk_insert_character(character_data_list):
         insert_character(character_data)
 
 
-def insert_character(char_data, alt_name=None):
+def insert_character(char_data, alt_name=None, overwrite=False):
     char_id = char_data["char_id"]
     en_name = char_data["en_name"]
     jp_name = char_data["jp_name"]
     images = char_data["images"]
 
-    if character_exists(char_id):
-        print(f"Character {char_id} {en_name} already exists in the database.")
+    exists = character_exists(char_id)
+
+    if exists and not overwrite:
+        print(f"Character {char_id} {en_name} already exists in the database and not overwriting.")
         return
 
     if not images:
@@ -55,11 +57,22 @@ def insert_character(char_data, alt_name=None):
     print(f"Inserting character {char_id} {en_name}")
     conn, cursor = get_connection()
 
-    cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""",
-                   (char_id, en_name, jp_name, alt_name))
-
+    if overwrite and exists:
+        # Character exists but we are overwriting its data.
+        # UNLESS it has an alt_name set, because it might have been manually changed.
+        cursor.execute("""UPDATE character SET en_name = ?, jp_name = ? WHERE id = ? AND alt_name = NULL;""",
+                        (en_name, jp_name, char_id))
+    else:
+        if not exists:
+            cursor.execute("""INSERT INTO character (id, en_name, jp_name, alt_name) VALUES (?,?,?,?);""",
+                        (char_id, en_name, jp_name, alt_name))
+    
     for image in images:
-        cursor.execute("""INSERT INTO images (character_id, mal_url, normal_url, mirror_url, flipped_url) VALUES (?,?,?,?,?);""", (char_id, image.mal_url, image.normal_url, image.mirror_url, image.upside_down_url))
+        if not character_has_image(cursor, char_id, image.mal_url):
+            print(f"Inserting image {image.mal_url}")
+            cursor.execute("""INSERT INTO images (character_id, mal_url, normal_url, mirror_url, flipped_url) VALUES (?,?,?,?,?);""", (char_id, image.mal_url, image.normal_url, image.mirror_url, image.upside_down_url))
+        else:
+            print(f"Character {char_id} already has image with MAL URL {image.mal_url}. Skipping image.")
 
     conn.commit()
     conn.close()
@@ -561,6 +574,14 @@ def character_has_show(char_id, show_id):
     cursor.execute("""SELECT id FROM show_character WHERE char_id = ? AND show_id = ?;""", (char_id, show_id))
     rows = cursor.fetchall()
     conn.close()
+    if not rows:
+        return False
+    else:
+        return True
+
+def character_has_image(cursor, char_id, mal_url):
+    cursor.execute("""SELECT id FROM images WHERE character_id = ? AND mal_url = ?;""", (char_id, mal_url))
+    rows = cursor.fetchall()
     if not rows:
         return False
     else:
