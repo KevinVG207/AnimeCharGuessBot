@@ -1,5 +1,5 @@
 -- Created by Vertabelo (http://vertabelo.com)
--- Last modification date: 2022-01-22 21:44:43.038
+-- Last modification date: 2022-08-03 16:38:08.253
 
 -- tables
 -- Table: character
@@ -22,9 +22,12 @@ CREATE TABLE guild (
 -- Table: images
 CREATE TABLE images (
     id integer NOT NULL CONSTRAINT images_pk PRIMARY KEY AUTOINCREMENT,
-    url text NOT NULL,
+    mal_url text NOT NULL,
     character_id integer NOT NULL,
     droppable boolean NOT NULL DEFAULT 1,
+    normal_url text NOT NULL,
+    mirror_url text NOT NULL,
+    flipped_url text NOT NULL,
     CONSTRAINT images_character FOREIGN KEY (character_id)
     REFERENCES character (id)
     ON DELETE CASCADE
@@ -36,7 +39,8 @@ CREATE TABLE show (
     mal_id integer NOT NULL,
     is_manga boolean NOT NULL DEFAULT 0,
     jp_title text NOT NULL,
-    en_title text
+    en_title text,
+    mal_url integer
 );
 
 -- Table: show_character

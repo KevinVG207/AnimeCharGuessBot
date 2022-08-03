@@ -463,12 +463,27 @@ class AnimeCharGuessBot(discord.Client):
 
         return
 
+    @command('a.queue', require_bot_admin=True)
+    async def command_admin_queue(self, args):
+        """
+        Displays the bot's show queue.
+        """
+        await display.page(self, args, self.show_queue.show_queue, "Current show queue.")
+
+
     @command('a.update', require_bot_admin=True)
     async def command_admin_update(self, args):
         """
-        Updates character images.
+        Developer command that does whatever the dev wants it to do right now.
         """
-        await db.update_images()
+        for show_url in db.get_all_show_mal_urls():
+            self.show_queue.add_url(show_url)
+        
+        if not self.show_queue.running:
+            self.show_queue.running = True
+            await mal_tools.run_queue(self.show_queue)
+        
+        return
 
 
     # @command('a.changename', require_bot_admin=True)

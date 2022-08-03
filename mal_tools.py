@@ -71,14 +71,18 @@ class ShowQueue:
 
     def get_url(self):
         if self.show_queue:
-            return self.show_queue.pop(0)
+            return self.show_queue[0]
         else:
             return None
 
 
     def add_url(self, url):
         self.show_queue.append(url)
-
+    
+    def pop(self):
+        if self.show_queue:
+            return self.show_queue.pop(0)
+        return None
 
 def getShowURLSegment(show_url):
     no_domain = show_url.split("myanimelist.net/")[1]
@@ -97,6 +101,8 @@ def getShowURLSegment(show_url):
 def getShowID(show_url):
     show_url_segment, is_manga = getShowURLSegment(show_url)
     if show_url_segment:
+        if show_url_segment.isnumeric():
+            return show_url_segment
         show_id = show_url_segment.split("/")[0]
         if show_id.isnumeric():
             return int(show_id)
@@ -110,13 +116,38 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
         print("Error, show url not found.")
         return -1
     print("="*20)
-    print(show_url_segment)
-    if is_manga:
-        request_url = f"https://myanimelist.net/manga/{show_url_segment}"
-    else:
-        request_url = f"https://myanimelist.net/anime/{show_url_segment}"
+    print(is_manga, show_url_segment)
 
-    page = requests.get(f"{request_url}/characters")
+    if show_url_segment.isnumeric():
+        if is_manga:
+            request_url = f"https://myanimelist.net/manga/{mal_id}"
+        else:
+            request_url = f"https://myanimelist.net/anime/{mal_id}"
+
+        await asyncio.sleep(20)
+        page = requests.get(request_url)
+
+        if not page.ok:
+            print(f"[ERR] Error in get-request {request_url}")
+            return
+
+        soup = BeautifulSoup(page.content, "html.parser")
+
+        character_href = soup.find_all('a', text="More characters")[0]['href']
+        if not character_href:
+            print(f"[ERR] Could not find character href on page {request_url}")
+            return
+        if not character_href.startswith("https://"):
+            character_href = """https://myanimelist.net""" + character_href
+    
+    else:
+        if is_manga:
+            character_href = f"https://myanimelist.net/manga/{show_url_segment}/characters"
+        else:
+            character_href = f"https://myanimelist.net/anime/{show_url_segment}/characters"
+
+    await asyncio.sleep(20)
+    page = requests.get(character_href)
     soup = BeautifulSoup(page.content, "html.parser")
 
     if not is_manga:
@@ -164,8 +195,6 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
         character_data = await downloadCharacterFromURL(character_url["href"])
         db.insert_character(character_data, overwrite=overwrite)
         db.add_show_to_character(character_id, show_id)
-
-    await asyncio.sleep(20)
 
 
 def getCharacterIDFromURL(character_url):
@@ -232,4 +261,14 @@ async def getImages(image_page_url):
 async def run_queue(show_queue: ShowQueue):
     while show_queue.has_next():
         await downloadInsertShowCharacters(show_queue.get_url(), overwrite=True)
+        show_queue.pop()
     show_queue.running = False
+
+def show_url_from_id(mal_id, is_manga):
+    base = """https://myanimelist.net/"""
+    if is_manga:
+        base += "manga/"
+    else:
+        base += "anime/"
+    base += str(mal_id)
+    return base

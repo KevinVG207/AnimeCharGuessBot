@@ -1095,6 +1095,20 @@ async def update_images():
     conn.commit()
     conn.close()
 
+def get_all_show_mal_urls():
+    url_list = list()
+
+    conn, cursor = get_connection()
+    cursor.execute("""SELECT mal_id, is_manga FROM show;""")
+    rows = cursor.fetchall()
+    for row in rows:
+        mal_id = row[0]
+        is_manga = row[1]
+        url_list.append(mal_tools.show_url_from_id(mal_id, is_manga))
+    conn.close()
+
+    return url_list
+
 
 # def change_name(char_id, en_name):
 #
