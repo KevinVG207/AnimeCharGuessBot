@@ -228,7 +228,7 @@ async def downloadCharacter(char_id):
         if link["href"].endswith("/pics"):
             image_page_url = link["href"]
 
-    image_objects = await getImages(image_page_url)
+    image_objects = await getImages(image_page_url, char_id)
 
     return {"char_id": char_id,
             "en_name": en_name.strip(),
@@ -236,7 +236,7 @@ async def downloadCharacter(char_id):
             "images": image_objects}
 
 
-async def getImages(image_page_url):
+async def getImages(image_page_url, char_id):
     await asyncio.sleep(2)
     image_page = requests.get(image_page_url)
     img_soup = BeautifulSoup(image_page.content, "html.parser")
@@ -250,10 +250,13 @@ async def getImages(image_page_url):
     # Remove duplicates
     image_urls = list(dict.fromkeys(image_urls))
 
+    existing_image_urls = db.get_character_image_urls(char_id)
+
     image_objects = list()
     for image_url in image_urls:
-        await asyncio.sleep(30)
-        image_objects.append(await CharacterImage.create(image_url))
+        if image_url not in existing_image_urls:
+            await asyncio.sleep(30)
+            image_objects.append(await CharacterImage.create(image_url))
 
     return image_objects
 

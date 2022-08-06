@@ -1109,6 +1109,15 @@ def get_all_show_mal_urls():
 
     return url_list
 
+def get_character_image_urls(char_id):
+    image_urls = list()
+    conn, cursor = get_connection()
+    cursor.execute("""SELECT DISTINCT mal_url FROM images WHERE character_id = ?;""", (char_id,))
+    rows = cursor.fetchall()
+    for row in rows:
+        image_urls.append(row[0])
+    conn.close()
+    return image_urls
 
 # def change_name(char_id, en_name):
 #

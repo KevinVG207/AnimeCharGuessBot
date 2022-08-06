@@ -476,7 +476,21 @@ class AnimeCharGuessBot(discord.Client):
         """
         Developer command that does whatever the dev wants it to do right now.
         """
-        for show_url in db.get_all_show_mal_urls():
+        skip = args.arguments_string
+        if skip != '':
+            if skip.isnumeric():
+                skip = int(skip)
+            else:
+                args.message.reply(embed = display.create_embed("Incorrect argument", "Not a number"))
+                return
+        else:
+            skip = None
+
+        show_urls = db.get_all_show_mal_urls()
+        if skip:
+            show_urls = show_urls[skip:]
+
+        for show_url in show_urls:
             self.show_queue.add_url(show_url)
         
         if not self.show_queue.running:
