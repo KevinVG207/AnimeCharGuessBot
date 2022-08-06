@@ -320,8 +320,16 @@ class AnimeCharGuessBot(discord.Client):
             # Assigned channel does not exist, so don't drop.
             return
 
+
+        drop = self.active_drops.get(guild.id)
+
         # Mark the channel as having a drop, so new drops aren't created when there is already one being made
         self.active_drops[guild.id] = True
+
+        # If the channel already had a drop, a new one was forced. Show the timeout embed for it before replacing.
+        if isinstance(drop, Drop):
+            self.active_drops[guild.id] = True
+            await channel.send(embed = drop.create_timeout_embed())
 
         drop = await Drop.create(channel)
 
