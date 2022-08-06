@@ -532,6 +532,7 @@ class AnimeCharGuessBot(discord.Client):
             log_lines = lines[-amount:]
         
         await self.send_admin_dm(display.create_embed("Log snippet", "```" + "\n".join(["    " + line for line in log_lines]) + "```"))
+        await args.message.reply(embed = display.create_embed("Log sent", "A log snippet has been sent to the developer."))
         return
         
 
