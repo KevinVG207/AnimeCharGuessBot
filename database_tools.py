@@ -179,7 +179,11 @@ def can_drop(guild_id):
         return False
 
 
-def can_trade(user_id):
+def can_trade(user_id, bot):
+    # Any time "can trade" is checked, we need to make sure to cancel any timed out trades first.
+    
+    bot.timeout_trades()
+
     conn, cursor = get_connection()
     cursor.execute("""SELECT can_trade FROM user WHERE id = ? AND can_trade = 1;""", (user_id,))
     rows = cursor.fetchall()

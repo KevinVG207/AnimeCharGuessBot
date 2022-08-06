@@ -240,7 +240,7 @@ class AnimeCharGuessBot(discord.Client):
         Creates a trade between two users.
         """
 
-        if user1.id == user2.id or not db.can_trade(user1.id) or not db.can_trade(user2.id) or not db.can_remove(user1.id) or not db.can_remove(user2.id):
+        if user1.id == user2.id or not db.can_trade(user1.id, self) or not db.can_trade(user2.id, self) or not db.can_remove(user1.id) or not db.can_remove(user2.id):
             return None
 
         trade = Trade(user1, user2)
@@ -898,7 +898,7 @@ class AnimeCharGuessBot(discord.Client):
         You can also remove multiple waifus by using a search query the same as %PREFIX%waifus.
         """
         
-        if db.can_remove(args.user.id) and db.can_trade(args.user.id):
+        if db.can_remove(args.user.id) and db.can_trade(args.user.id, self):
             db.disable_remove(args.user.id)
 
         else:
@@ -1521,7 +1521,7 @@ class AnimeCharGuessBot(discord.Client):
             ))
             
 
-    @command('view')
+    @command('view', 'info')
     async def command_view(self, args):
         """
         View details of a character including stats.
