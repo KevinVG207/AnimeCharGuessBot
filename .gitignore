@@ -10,6 +10,7 @@ database/*
 .env
 
 discord.log
+log.log
 run.sh
 server.py
 bot_token.py

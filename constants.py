@@ -1,5 +1,6 @@
 import discord
 import time
+import os
 
 # Constants used by the bot in various places.
 import bot_token
@@ -7,6 +8,8 @@ import bot_token
 ENVVAR_PREFIX = 'ACGB_'
 START_TIME = time.time()
 VERIFICATION_URL = "https://discord.com/"
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+LOG_FILE = os.path.join(WORKING_DIR, "log.log")
 
 BOT_OBJECT = None
 CHARACTER_TIMEOUT = 30

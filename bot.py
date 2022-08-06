@@ -502,6 +502,33 @@ class AnimeCharGuessBot(discord.Client):
         return
 
 
+    @command('a.log', require_bot_admin=True)
+    async def command_admin_log(self, args):
+        """
+        DM the last log messages to the developer.
+        """
+        amount = args.arguments_string
+        if not amount:
+            amount = 1
+        elif not amount.isnumeric() or int(amount) > 50 or int(amount) < 1:
+            await args.message.reply(embed = display.create_embed("Incorrect argument", "Please enter a valid number."))
+            return
+        
+        amount = int(amount)
+
+        log_lines = list()
+        with open(constants.LOG_FILE, "r") as log_file:
+            lines = log_file.read().splitlines()
+            if amount > len(lines):
+                amount = len(lines)
+            log_lines = lines[-amount:]
+        
+        await self.send_admin_dm(display.create_embed("Log snippet", "```" + "\n".join(["    " + line for line in log_lines]) + "```"))
+        return
+        
+
+        
+
     # @command('a.changename', require_bot_admin=True)
     # async def command_admin_changename(self, args):
     #     """
