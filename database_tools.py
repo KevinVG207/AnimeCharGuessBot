@@ -8,6 +8,8 @@ import bot_token
 import constants
 import mal_tools
 import name_tools as nt
+import logging
+logger = logging.getLogger('discord')
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 DATABASE_URI = WORKING_DIR + "/database/database.db"
@@ -21,7 +23,7 @@ def get_connection():
 
 
 def create_database():
-    print("Setting up DB.")
+    logger.info("Setting up DB.")
     conn, cursor = get_connection()
 
     create_script = open("database/create.sql")
@@ -30,7 +32,7 @@ def create_database():
     create_script.close()
 
     conn.close()
-    print("Finished setting up DB")
+    logger.info("Finished setting up DB")
 
 
 def bulk_insert_character(character_data_list):
@@ -47,14 +49,14 @@ def insert_character(char_data, alt_name=None, overwrite=False):
     exists = character_exists(char_id)
 
     if exists and not overwrite:
-        print(f"Character {char_id} {en_name} already exists in the database and not overwriting.")
+        logger.warn(f"Character {char_id} {en_name} already exists in the database and not overwriting.")
         return
 
     if not images:
-        print(f"Character {char_id} {en_name} does not have any images. Skipping.")
+        logger.warn(f"Character {char_id} {en_name} does not have any images. Skipping.")
         return
 
-    print(f"Inserting character {char_id} {en_name}")
+    logger.info(f"Inserting character {char_id} {en_name}")
     conn, cursor = get_connection()
 
     if overwrite and exists:
@@ -69,10 +71,10 @@ def insert_character(char_data, alt_name=None, overwrite=False):
     
     for image in images:
         if not character_has_image(cursor, char_id, image.mal_url):
-            print(f"Inserting image {image.mal_url}")
+            logger.info(f"Inserting image {image.mal_url}")
             cursor.execute("""INSERT INTO images (character_id, mal_url, normal_url, mirror_url, flipped_url) VALUES (?,?,?,?,?);""", (char_id, image.mal_url, image.normal_url, image.mirror_url, image.upside_down_url))
         else:
-            print(f"Character {char_id} already has image with MAL URL {image.mal_url}. Skipping image.")
+            logger.warn(f"Character {char_id} already has image with MAL URL {image.mal_url}. Skipping image.")
 
     conn.commit()
     conn.close()
@@ -549,7 +551,7 @@ LIMIT ?, 1;""", (user_id, waifu_index))
 
 def insert_show(mal_id, jp_title, en_title, is_manga):
     conn, cursor = get_connection()
-    print(f"Inserting show {mal_id} {en_title}, is_manga: {is_manga}")
+    logger.info(f"Inserting show {mal_id} {en_title}, is_manga: {is_manga}")
 
     cursor.execute("""INSERT INTO show (mal_id, jp_title, en_title, is_manga) VALUES (?,?,?,?)""",
                    (mal_id, jp_title, en_title, is_manga))
@@ -590,7 +592,7 @@ def character_has_image(cursor, char_id, mal_url):
 
 def add_show_to_character(char_id, show_id):
     conn, cursor = get_connection()
-    print(f"Adding show {show_id} to character {char_id}")
+    logger.info(f"Adding show {show_id} to character {char_id}")
     cursor.execute("""INSERT INTO show_character (char_id, show_id) VALUES (?,?);""", (char_id, show_id))
     conn.commit()
     conn.close()
@@ -863,7 +865,7 @@ def add_user_currency(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Added {amount} currency to {user_id}")
+    logger.info(f"Added {amount} currency to {user_id}")
     return
 
 
@@ -883,7 +885,7 @@ def subtract_user_currency(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Subtracted {amount} currency from {user_id}")
+    logger.info(f"Subtracted {amount} currency from {user_id}")
     return True
 
 
@@ -931,7 +933,7 @@ def add_user_upgrades(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Added {amount} upgrades to {user_id}")
+    logger.info(f"Added {amount} upgrades to {user_id}")
     return
 
 
@@ -951,7 +953,7 @@ def subtract_user_upgrades(user_id, amount, connection=None):
     conn.commit()
     if not connection:
         conn.close()
-    print(f"Subtracted {amount} upgrades from {user_id}")
+    logger.info(f"Subtracted {amount} upgrades from {user_id}")
     return True
 
 
@@ -1084,7 +1086,7 @@ async def update_images():
     rows = cursor.fetchall()
     for row in rows:
         cur_id = row[0]
-        print(f"Updating image {cur_id}, character: {row[2]}")
+        logger.info(f"Updating image {cur_id}, character: {row[2]}")
         mal_url = row[1]
         images_obj = await mal_tools.CharacterImage.create(mal_url)
         if images_obj:

@@ -10,6 +10,8 @@ import constants
 import display
 import util
 from datetime import datetime
+import logging
+logger = logging.getLogger('discord')
 
 
 def verify():
@@ -29,20 +31,20 @@ async def handle_disconnect(from_reboot = False):
         if verify():
             return
 
-    print(f"{datetime.now()} Failed to connect to discord.")
+    logger.error(f"Failed to connect to discord.")
     write_downtime()
     retries = 0
     while retries < 8 or time.time() - constants.START_TIME < 600:
         if not bot_token.isDebug():
-            print(f"{datetime.now()} Restarting wlan0")
+            logger.info(f"{datetime.now()} Restarting wlan0")
             os.system("sudo ifconfig wlan0 down")
             time.sleep(1)
             os.system("sudo ifconfig wlan0 up")
         # Sleep for 30 seconds.
         time.sleep(15)
-        print(f"{datetime.now()} Checking for reconnect...")
+        logger.info(f"{datetime.now()} Checking for reconnect...")
         if verify():
-            print(f"{datetime.now()} Reconnected.")
+            logger.info(f"{datetime.now()} Reconnected.")
             if not from_reboot:
                 # If we're from reboot, the bot hasn't started yet.
                 # Instead, we just wait until on_ready() calls send_downtime_message().
@@ -51,7 +53,7 @@ async def handle_disconnect(from_reboot = False):
         retries += 1
 
     # Retries failed, reboot system.
-    print(f"{datetime.now()} Reconnecting failed. Rebooting.")
+    logger.error(f"{datetime.now()} Reconnecting failed. Rebooting.")
     reboot()
 
 

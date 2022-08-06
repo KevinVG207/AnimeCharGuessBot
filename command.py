@@ -2,6 +2,8 @@ import textwrap
 import display
 import database_tools as db
 import traceback
+import logging
+logger = logging.getLogger('discord')
 
 BAD_USAGE = object()
 USER_NOT_FOUND = object()
@@ -78,7 +80,7 @@ class Command:
                 result = await self.function(bot, arguments)
             except Exception as e:
                 traceback.print_exc()
-                print(e)
+                logger.info(e)
                 await self.generic_error(arguments)
                 raise e
 

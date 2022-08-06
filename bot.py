@@ -22,6 +22,8 @@ import uma
 import util
 import waifu_filter
 from waifu import Waifu, Character
+import logging
+logger = logging.getLogger('discord')
 
 _command_map = dict()
 
@@ -78,13 +80,13 @@ class AnimeCharGuessBot(discord.Client):
 
         await internet.send_downtime_message(from_reboot=True)
 
-        print(f"Bot has logged in as {self.user}")
+        logger.info(f"Bot has logged in as {self.user}")
         for g in self.guilds:
-            print(g.name, g.id)
+            logger.info(f"{g.name}, {g.id}")
             if g.id == self.resource_server:
                 self.resource_channel = await g.fetch_channel(self.resource_channel_id)
 
-        print(f"Resource channel: {self.resource_channel.id}")
+        logger.info(f"Resource channel: {self.resource_channel.id}")
 
         loop = asyncio.get_event_loop()
         loop.create_task(uma.run())

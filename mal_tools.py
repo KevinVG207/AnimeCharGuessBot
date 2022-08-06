@@ -9,6 +9,8 @@ from PIL import Image, ImageOps
 
 import constants
 import database_tools as db
+import logging
+logger = logging.getLogger('discord')
 
 
 class CharacterImage:
@@ -93,7 +95,7 @@ def getShowURLSegment(show_url):
     elif no_domain.startswith("manga/"):
         is_manga = True
     else:
-        print("Error: Not a valid MAL anime/manga URL!")
+        logger.error("Not a valid MAL anime/manga URL!")
         return None, None
     return no_domain.split("/", 1)[1], is_manga
 
@@ -113,10 +115,10 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
     show_url_segment, is_manga = getShowURLSegment(show_url)
     mal_id = getShowID(show_url)
     if not show_url_segment or not mal_id:
-        print("Error, show url not found.")
+        logger.error("Show url not found.")
         return -1
-    print("="*20)
-    print(is_manga, show_url_segment)
+    logger.info("="*20)
+    logger.info(f"{is_manga}, {show_url_segment}")
 
     if show_url_segment.isnumeric():
         if is_manga:
@@ -128,14 +130,14 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
         page = requests.get(request_url)
 
         if not page.ok:
-            print(f"[ERR] Error in get-request {request_url}")
+            logger.error(f"Error in get-request {request_url}")
             return
 
         soup = BeautifulSoup(page.content, "html.parser")
 
         character_href = soup.find_all('a', text="More characters")[0]['href']
         if not character_href:
-            print(f"[ERR] Could not find character href on page {request_url}")
+            logger.error(f"Could not find character href on page {request_url}")
             return
         if not character_href.startswith("https://"):
             character_href = """https://myanimelist.net""" + character_href
@@ -155,7 +157,7 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
     else:
         jp_title_element = soup.find("span", itemprop="name")
     if not jp_title_element:
-        print(f"[ERR] Could not find JP Anime Title for {show_url_segment}")
+        logger.error(f"Could not find JP Anime Title for {show_url_segment}")
         return -1
     jp_title = jp_title_element.text
     en_title_element = soup.find("p", class_="title-english")
@@ -177,7 +179,7 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
         character_tables = soup.find_all("table", class_="js-manga-character-table")
 
     character_count = len(character_tables)
-    print(f"Found {character_count} characters.")
+    logger.info(f"Found {character_count} characters.")
 
     for character_table in character_tables:
         character_url = character_table.find_all("a", href=True)[0]
@@ -186,7 +188,7 @@ async def downloadInsertShowCharacters(show_url, overwrite=False):
             # Check if already exists and ignore if so.
             if db.character_exists(character_id):
                 if db.character_has_show(character_id, show_id):
-                    print(f"Character {character_id} already exists.")
+                    logger.warn(f"Character {character_id} already exists.")
                     continue
                 else:
                     # Add show to character.
@@ -206,14 +208,14 @@ async def downloadCharacterFromURL(character_url):
 
 
 async def downloadCharacter(char_id):
-    print(f"Downloading character {char_id}", end=" ")
+    logger.info(f"Downloading character {char_id}", end=" ")
     await asyncio.sleep(20)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
     soup = BeautifulSoup(page.content, "html.parser")
 
     full_name = soup.find_all("h2", class_="normal_header")[0].text
-    print(full_name)
+    logger.info(full_name)
     if " (" in full_name:
         en_name, jp_name = full_name.split(" (", 1)
         jp_name = jp_name.rsplit(")", 1)[0]

@@ -15,6 +15,8 @@ import display
 from discord import Color
 import deepl
 from bs4 import BeautifulSoup
+import logging
+logger = logging.getLogger('discord')
 
 
 UPDATE_LOG = "uma_update.txt"
@@ -79,10 +81,10 @@ def get_latest_news() -> list:
         "offset": 0
     }
     if bot_token.isDebug():
-        print(payload)
+        logger.info(payload)
     r = requests.post("https://umamusume.jp/api/ajax/pr_info_index?format=json", json=payload)
     # if bot_token.isDebug():
-    #     print(r.json())
+    #     logger.info(r.json())
     return r.json()["information_list"]
 
 
@@ -118,7 +120,7 @@ def get_article_latest_time(article: dict) -> int:
 
 def get_new_news() -> tuple[list, int]:
     if bot_token.isDebug():
-        print("In get news")
+        logger.info("In get news")
     last_check, last_articles = get_last_check()
 
     new_articles = list()
@@ -210,14 +212,14 @@ def format_bug_report(message: str) -> str:
     known_segment = str()
     fixed_segment = str()
 
-    print(f"Known bugs: {len(known_bugs)}, fixed bugs: {len(fixed_bugs)}")
+    logger.info(f"Known bugs: {len(known_bugs)}, fixed bugs: {len(fixed_bugs)}")
 
     if known_bugs:
         known_segment = "\n\n**■現在確認している不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
     if fixed_bugs:
         fixed_segment = "\n\n**■修正済みの不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
 
-    print(fixed_segment)
+    logger.info(fixed_segment)
 
     out_message = before + known_segment + fixed_segment
 
@@ -239,12 +241,12 @@ def replace_names(string: str, prefix='') -> str:
 
 
 def save_current_gacha_info(gacha_time_window, trainable, trainable_image, support, support_image):
-    print("Updating gacha info:")
-    print(gacha_time_window)
-    print(trainable)
-    print(trainable_image)
-    print(support)
-    print(support_image)
+    logger.info("Updating gacha info:")
+    logger.info(gacha_time_window)
+    logger.info(trainable)
+    logger.info(trainable_image)
+    logger.info(support)
+    logger.info(support_image)
     with open("uma_gacha_info.json", "w", encoding='utf-8') as f:
         json.dump({
             "gacha_time_window": gacha_time_window,
@@ -306,7 +308,7 @@ def update_gacha_info(raw_message):
 
 
 async def run():
-    print("Started uma process")
+    logger.info("Started uma process")
     if not constants.BOT_OBJECT.uma_running:
         constants.BOT_OBJECT.uma_running = True
         while True and constants.BOT_OBJECT:
@@ -314,7 +316,7 @@ async def run():
             
             do_ping = False
             for article_tuple in new_news:
-                print(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
+                logger.info(f"""{math.floor(time.time())}\tNew Uma News!\t{article_tuple[1]["announce_id"]}""")
                 article = article_tuple[1]
 
                 raw_title = article["title"]
@@ -345,7 +347,7 @@ async def run():
                 # Check for special case:
                 if article["title"] == "現在確認している不具合について":
                     # This is a bug report news article!
-                    print("Bug report found.")
+                    logger.info("Bug report found.")
                     raw_message = format_bug_report(raw_message)
 
                 cleaned_message = clean_message(raw_message)[:4000]

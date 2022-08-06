@@ -1,29 +1,27 @@
 #!/usr/bin/python3
+import logger as loggermodule
+import logging
+logger = logging.getLogger('discord')
+
 import bot_token
 if bot_token.isDebug():
     from dotenv import load_dotenv
     load_dotenv()
-    print("Debug mode")
+    logger.info("Debug mode")
 
 import asyncio
 import os
 
 import discord
-import logging
 import constants
 import bot
 import internet
 
+logger.info("Starting main script.")
+
 # Verify internet connection.
 if not internet.verify():
     asyncio.run(internet.handle_disconnect(from_reboot=True))
-
-
-logger = logging.getLogger('discord')
-logger.setLevel(logging.WARNING)
-handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
-handler.setFormatter(logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s"))
-logger.addHandler(handler)
 
 intents = discord.Intents().all()
 
@@ -45,4 +43,7 @@ client = bot.AnimeCharGuessBot(token = token,
                                admins = admins,
                                resource_server = resource_server,
                                resource_channel = resource_channel)
+
+logger.info("Running client.")
+
 client.run()
