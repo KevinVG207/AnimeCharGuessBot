@@ -208,7 +208,7 @@ async def downloadCharacterFromURL(character_url):
 
 
 async def downloadCharacter(char_id):
-    logger.info(f"Downloading character {char_id}", end=" ")
+    logger.info(f"Downloading character {char_id}")
     await asyncio.sleep(20)
 
     page = requests.get(f"https://myanimelist.net/character/{char_id}")
