@@ -360,7 +360,7 @@ async def run():
                 do_ping = False
             delta = datetime.timedelta(hours=1)
             now = datetime.datetime.now()
-            next_hour = (now + delta).replace(microsecond=0, second=0, minute=1)
+            next_hour = (now + delta).replace(microsecond=0, second=0, minute=2)
             await asyncio.sleep((next_hour - now).seconds)
 
 async def get_url_token():
