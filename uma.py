@@ -75,17 +75,8 @@ def get_last_check() -> tuple[int, dict]:
 
 
 def get_latest_news() -> list:
-    payload = {
-        "announce_label": 1,  # 0=all, 1=game, 2=campaign(social media stuff), 3=media
-        "limit": 10,
-        "offset": 0
-    }
-    if bot_token.isDebug():
-        logger.info(payload)
-    r = requests.post("https://umamusume.jp/api/ajax/pr_info_index?format=json", json=payload)
-    # if bot_token.isDebug():
-    #     logger.info(r.json())
-    return r.json()["information_list"]
+    r = requests.get("https://umapyoi.net/api/v1/news/posts/latest/10/label/1")
+    return r.json()
 
 
 def convert_to_epoch(jst_time: str) -> int:
@@ -115,7 +106,7 @@ def get_article_latest_time(article: dict) -> int:
         latest_time = article["update_at"]
     else:
         latest_time = article["post_at"]
-    return convert_to_epoch(latest_time)
+    return latest_time
 
 
 def get_new_news() -> tuple[list, int]:
@@ -339,10 +330,8 @@ async def run():
                     if image_from_message:
                         image = image_from_message
 
-                raw_title = replace_names(raw_title)
-                raw_message = replace_names(raw_message)
-
-                translated_title = clean_message(TRANSLATOR.translate_text(raw_title, target_lang="EN-US").text)
+                translated_title = article["title_english"]
+                raw_message = article["message_english"]
 
                 # Check for special case:
                 if article["title"] == "現在確認している不具合について":
