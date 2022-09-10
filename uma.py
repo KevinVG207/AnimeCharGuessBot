@@ -134,10 +134,13 @@ def get_new_news() -> tuple[list, int]:
 
 def clean_message(message: str) -> str:
     return re.sub(r"<.*?>", "", message
+                  .rstrip()
+                  .lstrip()
+                  .replace("> ", ">")
                   .replace("<h2", "**<h2")
                   .replace("</h2>", "**<br>")
-                  .replace("<br><br>", "<br>")
-                  .replace("<br>", "\n\n")
+                  .replace("<br><br>", "\n\n")
+                  .replace("<br>", "\n")
                   .replace("&nbsp;", " ")
                   .replace("&lt;", "<")
                   .replace("&gt;", ">"))
@@ -151,15 +154,16 @@ def make_month_day(text: str) -> tuple[int, int]:
     return int(month), int(day)
 
 
-def format_bug_report(message: str) -> str:
+def format_bug_report(en_message: str, jp_message: str) -> str:
     tz = pytz.timezone("Japan")
     localized_now = tz.localize(datetime.datetime.utcnow())
+    # localized_now = tz.localize(datetime.datetime(2022, 9, 9, 8, 0))
 
     known_bugs = list()
     fixed_bugs = list()
 
     first = True
-    before = str()
+    before = "The following issues are currently occurring in the game."
 
     current_month_day = tuple()
     current_date_str = str()
@@ -167,11 +171,13 @@ def format_bug_report(message: str) -> str:
 
     in_known = False
 
-    soup = BeautifulSoup(message, "html.parser")
-    for element in soup:
+    jp = BeautifulSoup(jp_message, "html.parser")
+    en = BeautifulSoup(en_message, "html.parser")
+
+    for element_tuple in zip(list(jp), list(en)):
+        element = element_tuple[0]
         if first:
             first = False
-            before = element.text
         else:
             if not element.text:
                 continue
@@ -188,10 +194,10 @@ def format_bug_report(message: str) -> str:
                         else:
                             fixed_bugs.append(bug_tuple)
                 current_month_day = make_month_day(element.text)
-                current_date_str = element.text
+                current_date_str = element_tuple[1].text
                 current_lines = list()
             else:
-                current_lines.append(element.get_text(separator="\n"))
+                current_lines.append(element_tuple[1].get_text(separator="\n"))
     if current_lines:
         if current_month_day == (localized_now.month, localized_now.day):
             bug_tuple = (current_date_str, current_lines)
@@ -206,9 +212,9 @@ def format_bug_report(message: str) -> str:
     logger.info(f"Known bugs: {len(known_bugs)}, fixed bugs: {len(fixed_bugs)}")
 
     if known_bugs:
-        known_segment = "\n\n**■現在確認している不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
+        known_segment = "\n\n**■ Currently confirmed bugs:**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
     if fixed_bugs:
-        fixed_segment = "\n\n**■修正済みの不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
+        fixed_segment = "\n\n**■ Fixed bugs:**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
 
     logger.info(fixed_segment)
 
@@ -331,18 +337,18 @@ async def run():
                         image = image_from_message
 
                 translated_title = article["title_english"]
-                raw_message = article["message_english"]
+                translated_message = article["message_english"]
 
                 # Check for special case:
-                if article["title"] == "現在確認している不具合について":
+                if article["announce_id"] == 155:
                     # This is a bug report news article!
                     logger.info("Bug report found.")
-                    raw_message = format_bug_report(raw_message)
+                    translated_message = format_bug_report(translated_message, article['message'])
+                else:
+                    translated_message = clean_message(translated_message) \
+                        .replace("[", "\\[") \
+                        .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
 
-                cleaned_message = clean_message(raw_message)[:4000]
-                translated_message = TRANSLATOR.translate_text(cleaned_message, target_lang="EN-US").text \
-                    .replace("[", "\\[") \
-                    .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
                 if len(translated_message) > 2000:
                     translated_message = translated_message[:1997] + "..."
                 if translated_message[-1] != "\n":
