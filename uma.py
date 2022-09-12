@@ -197,7 +197,7 @@ def format_bug_report(en_message: str, jp_message: str) -> str:
                 current_date_str = element_tuple[1].text
                 current_lines = list()
             else:
-                current_lines.append(element_tuple[1].get_text(separator="\n"))
+                current_lines.append(element_tuple[1].get_text(separator="\n").lstrip().rstrip())
     if current_lines:
         if current_month_day == (localized_now.month, localized_now.day):
             bug_tuple = (current_date_str, current_lines)
