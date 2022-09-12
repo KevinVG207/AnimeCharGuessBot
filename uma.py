@@ -353,7 +353,7 @@ async def run():
                     translated_message = translated_message[:1997] + "..."
                 if translated_message[-1] != "\n":
                     translated_message += "\n"
-                translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
+                translated_message += f"""\n[View source](https://umapyoi.net/api/v1/news/posts/{article["announce_id"]}/source)"""
 
                 await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
                     translated_title,
