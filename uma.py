@@ -75,7 +75,7 @@ def get_last_check() -> tuple[int, dict]:
 
 
 def get_latest_news() -> list:
-    r = requests.get("https://umapyoi.net/api/v1/news/posts/latest/10/label/1")
+    r = requests.get("https://umapyoi.net/api/v1/news/latest/10/label/1")
     return r.json()
 
 
@@ -353,7 +353,7 @@ async def run():
                     translated_message = translated_message[:1997] + "..."
                 if translated_message[-1] != "\n":
                     translated_message += "\n"
-                translated_message += f"""\n[View source](https://umapyoi.net/api/v1/news/posts/{article["announce_id"]}/source)"""
+                translated_message += f"""\n[View source](https://umapyoi.net/api/v1/news/{article["announce_id"]}/source)"""
 
                 await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
                     translated_title,
