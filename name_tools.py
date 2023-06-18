@@ -22,7 +22,6 @@ def normalize_romanization(text):
         .replace('shi', 'si')
         .replace('chi', 'ti')
         .replace('tsu', 'tu')
-        .replace('tsu', 'tu')
         .replace('du', 'zu')
         .replace('oo', 'o')
         .replace('ou', 'o')
