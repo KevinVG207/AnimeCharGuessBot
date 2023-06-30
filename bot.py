@@ -536,25 +536,6 @@ class AnimeCharGuessBot(discord.Client):
         return
         
 
-    @command('repeat', only_in_assigned_channel=False)
-    async def command_admin_repeat(self, args):
-        """
-        Repeats a message.
-        """
-        text = args.arguments_string
-
-        if not text:
-            async for message in args.channel.history(limit=5, before=args.message):
-                if message.author == args.message.author:
-                    text = message.content
-                    break
-        
-        if not text:
-            return
-
-        await args.message.reply(text)
-        return
-
     # @command('a.changename', require_bot_admin=True)
     # async def command_admin_changename(self, args):
     #     """
@@ -1150,6 +1131,34 @@ class AnimeCharGuessBot(discord.Client):
                 'Something Went Wrong',
                 'Removal failed.'
             ))
+
+
+    @command('repeat', 'rep', only_in_assigned_channel=False)
+    async def command_repeat(self, args):
+        """
+        Repeats a message.
+
+        Repeats a message in the current channel.
+        Leave the message blank to repeat the last message you sent in the channel.
+
+        Usage: ``%PREFIX%%COMMAND% <message>``
+        """
+        text = args.arguments_string
+        replied_message = args.message
+
+        if not text:
+            async for message in args.channel.history(limit=5, before=args.message):
+                if message.author == args.message.author:
+                    text = message.content
+                    replied_message = message
+                    await args.message.delete()
+                    break
+        
+        if not text:
+            return
+
+        await replied_message.reply(text)
+        return
 
 
     @command('roll')
