@@ -1153,7 +1153,9 @@ class AnimeCharGuessBot(discord.Client):
                     replied_message = message
                     await args.message.delete()
                     break
-        
+
+        text = util.clean_mentions(text)
+
         if not text:
             return
 
