@@ -258,10 +258,6 @@ async def run():
                 raw_title = article["title"]
                 raw_message = article["message"]
 
-                if raw_title.endswith("ピックアップガチャ開催！"):
-                    # New gacha
-                    update_gacha_info(raw_message)
-
                 if bot_token.isDebug():
                     continue
 
@@ -380,7 +376,10 @@ def create_banner_embed(gacha_info, support=False):
     
     embed_description += f"\nBanner ends <t:{gacha_info['end_date']}:R>"
 
-    banner_image = f"https://gametora.com/images/umamusume/gacha/img_bnr_gacha_{gacha_info['id']}.png?t={int(time.time())}"
+    if not gacha_info['image_url']:
+        banner_image = f"https://gametora.com/images/umamusume/gacha/img_bnr_gacha_{gacha_info['id']}.png?t={int(time.time())}"
+    else:
+        banner_image = gacha_info['image_url']
 
     return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image)
 

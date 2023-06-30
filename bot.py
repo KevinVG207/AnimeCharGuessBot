@@ -536,7 +536,14 @@ class AnimeCharGuessBot(discord.Client):
         return
         
 
-        
+    @command('a.repeat', require_bot_admin=True, only_in_assigned_channel=False)
+    async def command_admin_repeat(self, args):
+        """
+        Repeats a message.
+        """
+        text = args.arguments_string
+        await args.message.reply(text)
+        return
 
     # @command('a.changename', require_bot_admin=True)
     # async def command_admin_changename(self, args):
