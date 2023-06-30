@@ -542,6 +542,16 @@ class AnimeCharGuessBot(discord.Client):
         Repeats a message.
         """
         text = args.arguments_string
+
+        if not text:
+            async for message in args.channel.history(limit=5, before=args.message):
+                if message.author == args.message.author:
+                    text = message.content
+                    break
+        
+        if not text:
+            return
+
         await args.message.reply(text)
         return
 
