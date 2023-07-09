@@ -279,7 +279,7 @@ class Waifu:
 
     def create_roll_embed(self, currency, total, price):
         '''
-        Create a Discord embed for when this waifu is rolled in the gatcha.
+        Create a Discord embed for when this waifu is rolled in the gacha.
         '''
 
         lines = [f'You rolled **{self.character.en_name}**\n']
@@ -291,7 +291,7 @@ class Waifu:
         lines.append(f':coin: Your {currency}: {total} (-{price})')
 
         return display.create_embed(
-            f"{self.owner.display_name}'s Gatcha Roll",
+            f"{self.owner.display_name}'s Gacha Roll",
             '\n'.join(lines),
             image = self.image_url
         )

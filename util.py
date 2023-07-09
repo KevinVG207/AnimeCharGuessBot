@@ -1,6 +1,7 @@
 import datetime
 import discord
 import time
+import re
 import http_tools as http
 from urllib.parse import urlparse
 
@@ -92,3 +93,15 @@ def next_daily_reset():
     unix = int(time.mktime(next_daily_reset.timetuple()))
 
     return unix
+
+def clean_mentions(text):
+    '''
+    Remove mentions from a string.
+    '''
+    # text = re.sub(r"<@[0-9]+>", "", text)  # Removes user mentions
+    # text = re.sub(r"<@![0-9]+>", "", text)  # Removes user mentions 2
+    # text = re.sub(r"<@&[0-9]+>", "", text)  # Removes role mentions
+    # text = re.sub(r"<#[0-9]+>", "", text)  # Removes channel mentions
+
+    # Catches everything but maybe not the best solution
+    return text.replace("@", "@\u200b")

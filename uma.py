@@ -75,17 +75,8 @@ def get_last_check() -> tuple[int, dict]:
 
 
 def get_latest_news() -> list:
-    payload = {
-        "announce_label": 1,  # 0=all, 1=game, 2=campaign(social media stuff), 3=media
-        "limit": 10,
-        "offset": 0
-    }
-    if bot_token.isDebug():
-        logger.info(payload)
-    r = requests.post("https://umamusume.jp/api/ajax/pr_info_index?format=json", json=payload)
-    # if bot_token.isDebug():
-    #     logger.info(r.json())
-    return r.json()["information_list"]
+    r = requests.get("https://umapyoi.net/api/v1/news/latest/10")
+    return r.json()
 
 
 def convert_to_epoch(jst_time: str) -> int:
@@ -115,7 +106,7 @@ def get_article_latest_time(article: dict) -> int:
         latest_time = article["update_at"]
     else:
         latest_time = article["post_at"]
-    return convert_to_epoch(latest_time)
+    return latest_time
 
 
 def get_new_news() -> tuple[list, int]:
@@ -143,10 +134,13 @@ def get_new_news() -> tuple[list, int]:
 
 def clean_message(message: str) -> str:
     return re.sub(r"<.*?>", "", message
+                  .rstrip()
+                  .lstrip()
+                  .replace("> ", ">")
                   .replace("<h2", "**<h2")
                   .replace("</h2>", "**<br>")
-                  .replace("<br><br>", "<br>")
-                  .replace("<br>", "\n\n")
+                  .replace("<br><br>", "\n\n")
+                  .replace("<br>", "\n")
                   .replace("&nbsp;", " ")
                   .replace("&lt;", "<")
                   .replace("&gt;", ">"))
@@ -160,15 +154,16 @@ def make_month_day(text: str) -> tuple[int, int]:
     return int(month), int(day)
 
 
-def format_bug_report(message: str) -> str:
+def format_bug_report(en_message: str, jp_message: str) -> str:
     tz = pytz.timezone("Japan")
     localized_now = tz.localize(datetime.datetime.utcnow())
+    # localized_now = tz.localize(datetime.datetime(2022, 9, 9, 8, 0))
 
     known_bugs = list()
     fixed_bugs = list()
 
     first = True
-    before = str()
+    before = "The following issues are currently occurring in the game."
 
     current_month_day = tuple()
     current_date_str = str()
@@ -176,11 +171,13 @@ def format_bug_report(message: str) -> str:
 
     in_known = False
 
-    soup = BeautifulSoup(message, "html.parser")
-    for element in soup:
+    jp = BeautifulSoup(jp_message, "html.parser")
+    en = BeautifulSoup(en_message, "html.parser")
+
+    for element_tuple in zip(list(jp), list(en)):
+        element = element_tuple[0]
         if first:
             first = False
-            before = element.text
         else:
             if not element.text:
                 continue
@@ -197,10 +194,10 @@ def format_bug_report(message: str) -> str:
                         else:
                             fixed_bugs.append(bug_tuple)
                 current_month_day = make_month_day(element.text)
-                current_date_str = element.text
+                current_date_str = element_tuple[1].text
                 current_lines = list()
             else:
-                current_lines.append(element.get_text(separator="\n"))
+                current_lines.append(element_tuple[1].get_text(separator="\n").lstrip().rstrip())
     if current_lines:
         if current_month_day == (localized_now.month, localized_now.day):
             bug_tuple = (current_date_str, current_lines)
@@ -215,9 +212,9 @@ def format_bug_report(message: str) -> str:
     logger.info(f"Known bugs: {len(known_bugs)}, fixed bugs: {len(fixed_bugs)}")
 
     if known_bugs:
-        known_segment = "\n\n**■現在確認している不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
+        known_segment = "\n\n**■ Currently confirmed bugs:**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in known_bugs])
     if fixed_bugs:
-        fixed_segment = "\n\n**■修正済みの不具合**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
+        fixed_segment = "\n\n**■ Fixed bugs:**\n" + "\n\n".join([segment[0] + "\n" + "\n".join(segment[1]) for segment in fixed_bugs])
 
     logger.info(fixed_segment)
 
@@ -240,71 +237,10 @@ def replace_names(string: str, prefix='') -> str:
     return string
 
 
-def save_current_gacha_info(gacha_time_window, trainable, trainable_image, support, support_image):
-    logger.info("Updating gacha info:")
-    logger.info(gacha_time_window)
-    logger.info(trainable)
-    logger.info(trainable_image)
-    logger.info(support)
-    logger.info(support_image)
-    with open("uma_gacha_info.json", "w", encoding='utf-8') as f:
-        json.dump({
-            "gacha_time_window": gacha_time_window,
-            "trainable": trainable,
-            "trainable_image": trainable_image,
-            "support": support,
-            "support_image": support_image}, f, ensure_ascii=False)
-
-
 def load_current_gacha_info():
-    if os.path.exists("uma_gacha_info.json"):
-        with open("uma_gacha_info.json", "r", encoding='utf-8') as f:
-            return json.load(f)
-    return dict()
-
-
-def update_gacha_info(raw_message):
-    soup = BeautifulSoup(raw_message, "html.parser")
-
-    gacha_time_window = list()
-    in_new_trainable = False
-    trainable = []
-    trainable_image = str()
-    in_new_support = False
-    support = []
-    support_image = str()
-    elements_list = list(soup)
-    for i, element in enumerate(elements_list):
-        if not element.text:
-            continue
-        if element.text == "ピックアップガチャ開催期間":
-            time_elements = elements_list[i + 1].text.split(" ～ ")
-            for time_element in time_elements:
-                gacha_time_window.append(short_date_to_epoch(time_element))
-
-        if "新登場の育成ウマ娘（ピックアップ対象）" in element.text:
-            trainable_image = elements_list[i - 1].find('img')['src']
-            in_new_trainable = True
-            continue
-        if "新登場のサポートカード（ピックアップ対象）" in element.text:
-            support_image = elements_list[i - 1].find('img')['src']
-            in_new_support = True
-            continue
-        
-        if in_new_trainable:
-            if not element.text.startswith("★"):
-                in_new_trainable = False
-                continue
-            trainable.append(replace_names(element.text, prefix=" "))
-            continue
-        if in_new_support:
-            if not element.text.startswith("・"):
-                in_new_support = False
-                break
-            support.append(replace_names(element.text[1:], prefix=" "))
-            continue
-
-    save_current_gacha_info(gacha_time_window, trainable, trainable_image, support, support_image)
+    r = requests.get("https://umapyoi.net/api/v1/gacha/current")
+    r.raise_for_status()
+    return r.json()
 
 
 async def run():
@@ -322,10 +258,6 @@ async def run():
                 raw_title = article["title"]
                 raw_message = article["message"]
 
-                if raw_title.endswith("ピックアップガチャ開催！"):
-                    # New gacha
-                    update_gacha_info(raw_message)
-
                 if bot_token.isDebug():
                     continue
 
@@ -339,26 +271,25 @@ async def run():
                     if image_from_message:
                         image = image_from_message
 
-                raw_title = replace_names(raw_title)
-                raw_message = replace_names(raw_message)
-
-                translated_title = clean_message(TRANSLATOR.translate_text(raw_title, target_lang="EN-US").text)
+                translated_title = article["title_english"]
+                translated_message = article["message_english"]
 
                 # Check for special case:
-                if article["title"] == "現在確認している不具合について":
+                if article["announce_id"] == 155:
                     # This is a bug report news article!
                     logger.info("Bug report found.")
-                    raw_message = format_bug_report(raw_message)
+                    translated_message = format_bug_report(translated_message, article['message'])
+                else:
+                    translated_message = clean_message(translated_message) \
+                        .replace("[", "\\[") \
+                        .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
 
-                cleaned_message = clean_message(raw_message)[:4000]
-                translated_message = TRANSLATOR.translate_text(cleaned_message, target_lang="EN-US").text \
-                    .replace("[", "\\[") \
-                    .replace("]", "\\]")  # Replacing these because of faulty parsing of url with custom text on mobile phones.
                 if len(translated_message) > 2000:
                     translated_message = translated_message[:1997] + "..."
                 if translated_message[-1] != "\n":
                     translated_message += "\n"
-                translated_message += f"""\n[View source](https://umamusume.jp/news/detail.php?id={article["announce_id"]})"""
+                translated_message += f"""\n[View full](https://umapyoi.net/news/{article["announce_id"]})"""
+                translated_message += f"""\n[View source](https://umapyoi.net/news/{article["announce_id"]}/source)"""
 
                 await constants.BOT_OBJECT.send_uma_embed(display.create_embed(
                     translated_title,
@@ -371,7 +302,7 @@ async def run():
                 do_ping = False
             delta = datetime.timedelta(hours=1)
             now = datetime.datetime.now()
-            next_hour = (now + delta).replace(microsecond=0, second=0, minute=1)
+            next_hour = (now + delta).replace(microsecond=0, second=0, minute=2)
             await asyncio.sleep((next_hour - now).seconds)
 
 async def get_url_token():
@@ -426,34 +357,36 @@ async def create_banner_embed_old(active_banner, gacha_data, support=False):
     return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image, thumbnail=banner_thumb)
 
 def create_banner_embed(gacha_info, support=False):
-    gacha_time_window = gacha_info['gacha_time_window']
-    if support:
-        embed_title = "Current Support Card Banner"
-        banner_image = gacha_info['support_image']
-        pickups = gacha_info['support']
-    else:
-        embed_title = "Current Character Banner"
-        banner_image = gacha_info['trainable_image']
-        pickups = gacha_info['trainable']
+    card_type = gacha_info['card_type']
+    embed_title = f"Current {card_type} Banner"
+
     embed_description = f"Banner pickups:\n"
-    for character in pickups:
-        embed_description += f"**{character}**\n"
+    for pickup in gacha_info['pickups']:
+        rarity = ""
+        if card_type == "Outfit":
+            rarity = "★" * pickup['default_rarity']
+        elif card_type == "Support Card":
+            rarity = pickup['rarity_string']
+        
+        title = pickup['title_en'] if pickup['title_en'] else pickup['title']
+
+        chara_name = pickup['chara_data']['name_en'] if pickup['chara_data']['name_en'] else pickup['chara_data']['name_en_internal']
+
+        embed_description += f"**{rarity} {title} {chara_name}**\n"
     
-    embed_description += f"\nBanner ends <t:{gacha_time_window[1]}:R>."
+    embed_description += f"\nBanner ends <t:{gacha_info['end_date']}:R>"
+
+    if not gacha_info['image_url']:
+        banner_image = f"https://gametora.com/images/umamusume/gacha/img_bnr_gacha_{gacha_info['id']}.png?t={int(time.time())}"
+    else:
+        banner_image = gacha_info['image_url']
 
     return display.create_embed(embed_title, embed_description, color=Color.from_rgb(105, 193, 12), image=banner_image)
-    
 
 
 async def create_gacha_embeds():
-    gacha_info = load_current_gacha_info()
-    if not gacha_info:
+    banners = load_current_gacha_info()
+    if not banners:
         return None
 
-    char_banner_embeds = list()
-    if gacha_info['trainable']:
-        char_banner_embeds.append(create_banner_embed(gacha_info))
-    if gacha_info['support']:
-        char_banner_embeds.append(create_banner_embed(gacha_info, support=True))    
-
-    return char_banner_embeds
+    return [create_banner_embed(banner) for banner in banners]
