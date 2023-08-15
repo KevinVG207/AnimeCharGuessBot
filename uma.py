@@ -300,10 +300,19 @@ async def run():
                     timestamp=datetime.datetime.fromtimestamp(article_tuple[0])
                 ), do_ping)
                 do_ping = False
-            delta = datetime.timedelta(hours=1)
+            
+            # Find the next 15 minute mark + 2 minutes and sleep until then.
             now = datetime.datetime.now()
-            next_hour = (now + delta).replace(microsecond=0, second=0, minute=2)
-            await asyncio.sleep((next_hour - now).seconds)
+            next_15 = now + datetime.timedelta(minutes=15 - now.minute % 15)
+            next_15 = next_15.replace(second=0, microsecond=0)
+            next_15 += datetime.timedelta(minutes=2)
+            await asyncio.sleep((next_15 - now).seconds)
+
+
+            # delta = datetime.timedelta(hours=1)
+            # now = datetime.datetime.now()
+            # next_hour = (now + delta).replace(microsecond=0, second=0, minute=2)
+            # await asyncio.sleep((next_hour - now).seconds)
 
 async def get_url_token():
     """
