@@ -389,7 +389,10 @@ class AnimeCharGuessBot(discord.Client):
         vxtwitter_urls = []
 
         for url in urls:
-            parsed_url = urlparse(url)
+            try:
+                parsed_url = urlparse(url)
+            except:
+                continue
             domain = parsed_url.netloc
             if domain.startswith('www.'):
                 domain = domain[4:]
