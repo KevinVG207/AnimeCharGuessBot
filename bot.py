@@ -1,6 +1,8 @@
 import asyncio
 import os
 import time
+import re
+from urllib.parse import urlparse
 
 import aiohttp.client_exceptions
 import discord
@@ -150,7 +152,12 @@ class AnimeCharGuessBot(discord.Client):
                     await self.on_disconnect()
 
         elif message_content and message.guild:
-            # Not a command, but we are in a guild, so we might want to drop or check if a drop guess is correct.
+            # Not a command, but we are in a guild
+            
+            # Handle Twitter/X links
+            await self.handle_twitter(message)
+            
+            # We might want to drop or check if a drop guess is correct.
             drop = self.active_drops.get(message.guild.id)
 
             if isinstance(drop, Drop) and message.channel.id == db.get_assigned_channel_id(message.guild.id) and drop.guess_matches(message_content):
@@ -374,6 +381,26 @@ class AnimeCharGuessBot(discord.Client):
             '\n'.join(lines),
             image = drop.waifu.image_url
         ))
+    
+    async def handle_twitter(self, message):
+        url_regex = r'https?:\/\/[^\s]+'
+        urls = re.findall(url_regex, message.content)
+
+        vxtwitter_urls = []
+
+        for url in urls:
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc
+            if domain.startswith('www.'):
+                domain = domain[4:]
+            if domain in ['twitter.com', 'x.com']:
+                vx_url = "https://vxtwitter.com" + parsed_url.path
+                vxtwitter_urls.append(vx_url)
+        
+        if vxtwitter_urls:
+            await message.reply('\n'.join(vxtwitter_urls))
+        
+        return
 
 
     async def send_character_images(self, normal_path, mirror_path, upside_down_path):
