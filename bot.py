@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import aiohttp.client_exceptions
 import discord
+from discord.ext import tasks
 import random
 import shlex
 import textwrap
@@ -155,7 +156,8 @@ class AnimeCharGuessBot(discord.Client):
             # Not a command, but we are in a guild
             
             # Handle Twitter/X links
-            await self.handle_twitter(message)
+            await self.fix_urls(message, ['twitter.com', 'x.com'], "https://vxtwitter.com")
+            await self.fix_urls(message, ['pixiv.net'], "https://phixiv.net")
             
             # We might want to drop or check if a drop guess is correct.
             drop = self.active_drops.get(message.guild.id)
@@ -382,7 +384,7 @@ class AnimeCharGuessBot(discord.Client):
             image = drop.waifu.image_url
         ))
     
-    async def handle_twitter(self, message):
+    async def fix_urls(self, message, domains_list, new_prefix, suppress=True):
         url_regex = r'https?:\/\/[^\s]+'
         urls = re.findall(url_regex, message.content)
 
@@ -396,12 +398,24 @@ class AnimeCharGuessBot(discord.Client):
             domain = parsed_url.netloc
             if domain.startswith('www.'):
                 domain = domain[4:]
-            if domain in ['twitter.com', 'x.com']:
-                vx_url = "https://vxtwitter.com" + parsed_url.path
+            if domain in domains_list:
+                vx_url = new_prefix + parsed_url.path
                 vxtwitter_urls.append(vx_url)
         
         if vxtwitter_urls:
-            await message.reply('\n'.join(vxtwitter_urls))
+            reply = await message.reply('\n'.join(vxtwitter_urls))
+            view = display.DeleteButtonView(message.author, reply, 20)
+            await reply.edit(view=view)
+
+            if suppress:
+                # Hide the original embed
+
+                @tasks.loop(seconds=2, count=5)
+                async def hide_embed():
+                    await message.edit(suppress=True)
+                    return
+
+                hide_embed.start()
         
         return
 

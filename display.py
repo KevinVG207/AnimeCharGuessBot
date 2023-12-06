@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import discord
+from discord.ext import tasks
 
 import constants
 
@@ -140,3 +141,38 @@ async def page(bot, args, elements, title, page_no = None, page_size = 25, timeo
     else:
         # There is only one page, so just display that.
         await args.message.reply(embed = embed)
+
+class DeleteButtonView(discord.ui.View):
+    """ Delete button that indicates how long it can be used and then disappears.
+    """
+
+    def __init__(self, user, message, timeout):
+        self.user = user
+        self.message = message
+        self.timeout = timeout
+        super().__init__(timeout=timeout)
+
+        async def delete_button(interaction):
+            if interaction.user.id == user.id:
+                self.update_button.stop()
+                await self.message.delete()
+                self.stop()
+
+        self.delete_button = discord.ui.Button(label = f'Delete ({timeout}s)')
+        self.delete_button.callback = delete_button
+        self.add_item(self.delete_button)
+
+        self.update_button.start()
+    
+    async def on_timeout(self):
+        self.update_button.stop()
+        await self.message.edit(view = None)
+
+    @tasks.loop(seconds = 1)
+    async def update_button(self):
+        self.timeout -= 1
+        if self.timeout < 0:
+            self.timeout = 0
+
+        self.delete_button.label = f'Delete ({self.timeout}s)'
+        await self.message.edit(view = self)
