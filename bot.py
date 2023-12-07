@@ -404,15 +404,19 @@ class AnimeCharGuessBot(discord.Client):
         
         if vxtwitter_urls:
             reply = await message.reply('\n'.join(vxtwitter_urls))
-            view = display.DeleteButtonView(message.author, reply, 20)
-            await reply.edit(view=view)
+            # view = display.DeleteButtonView(message.author, reply, 20)
+            # await reply.edit(view=view)
 
             if suppress:
-                # Hide the original embed
+                # Hide the original embed as well as check if it's been deleted.
 
-                @tasks.loop(seconds=2, count=5)
+                @tasks.loop(seconds=2, count=10)
                 async def hide_embed():
-                    await message.edit(suppress=True)
+                    try:
+                        await message.edit(suppress=True)
+                    except discord.errors.NotFound:
+                        await reply.delete()
+                        hide_embed.stop()
                     return
 
                 hide_embed.start()
