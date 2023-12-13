@@ -391,6 +391,10 @@ class AnimeCharGuessBot(discord.Client):
         vxtwitter_urls = []
 
         for url in urls:
+            # Skip suppressed URLs.
+            if url.endswith('>'):
+                continue
+
             try:
                 parsed_url = urlparse(url)
             except:
@@ -409,8 +413,7 @@ class AnimeCharGuessBot(discord.Client):
 
             if suppress:
                 # Hide the original embed as well as check if it's been deleted.
-
-                @tasks.loop(seconds=2, count=10)
+                @tasks.loop(seconds=2, count=30)
                 async def hide_embed():
                     try:
                         await message.edit(suppress=True)
