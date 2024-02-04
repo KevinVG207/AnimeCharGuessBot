@@ -407,7 +407,7 @@ class AnimeCharGuessBot(discord.Client):
                 vxtwitter_urls.append(vx_url)
         
         if vxtwitter_urls:
-            reply = await message.reply('\n'.join(vxtwitter_urls))
+            reply = await message.reply('\n'.join(vxtwitter_urls), mention_author=False)
             # view = display.DeleteButtonView(message.author, reply, 20)
             # await reply.edit(view=view)
 
