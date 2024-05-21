@@ -30,8 +30,9 @@ class Drop:
         else:
             image_url = waifu.flipped_url
 
-        if not await util.verify_url(image_url):
-            return await cls.create(channel)
+        # TODO: WTF is this??
+        # if not await util.verify_url(image_url):
+        #     return await cls.create(channel)
 
         db.update_history(channel.guild.id, history, data)
         return cls(waifu, channel, image_url)

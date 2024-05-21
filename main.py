@@ -2,6 +2,7 @@
 import logger as loggermodule
 import logging
 logger = logging.getLogger('discord')
+# logger.setLevel(logging.DEBUG)
 
 import bot_token
 if bot_token.isDebug():

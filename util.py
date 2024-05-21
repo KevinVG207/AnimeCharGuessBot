@@ -5,6 +5,15 @@ import re
 import http_tools as http
 from urllib.parse import urlparse
 
+def get_urls(text):
+    url_regex = r'https?:\/\/[^\s]+'
+    urls = re.findall(url_regex, text)
+    return urls
+
+def get_image_urls(text):
+    urls = get_urls(text)
+    formats = ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+    return [url for url in urls if any(format in url for format in formats)]
 
 async def verify_url(url):
     """

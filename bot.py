@@ -24,6 +24,7 @@ from trade import Trade
 import uma
 import util
 import waifu_filter
+import nao
 from waifu import Waifu, Character
 import logging
 logger = logging.getLogger('discord')
@@ -111,6 +112,9 @@ class AnimeCharGuessBot(discord.Client):
         # Ignore messages from bots, including this one.
         if message.author.bot:
             return
+        
+        # # If the message has images, check for unsourced images.
+        # await nao.check_images(message)
 
         # Makes the bot completely case insensitive.
         message_content = message.content.lower()
@@ -316,6 +320,7 @@ class AnimeCharGuessBot(discord.Client):
         """
         Run a random drop in a guild.
         """
+        # return
 
         assigned_channel_id = db.get_assigned_channel_id(guild.id)
 
