@@ -92,8 +92,8 @@ class AnimeCharGuessBot(discord.Client):
 
         logger.info(f"Resource channel: {self.resource_channel.id}")
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(uma.run())
+        # loop = asyncio.get_event_loop()
+        # loop.create_task(uma.run())
 
 
     async def on_guild_remove(self, guild):
