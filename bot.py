@@ -114,7 +114,7 @@ class AnimeCharGuessBot(discord.Client):
             return
         
         # # If the message has images, check for unsourced images.
-        # await nao.check_images(message)
+        await nao.check_images(message)
 
         # Makes the bot completely case insensitive.
         message_content = message.content.lower()

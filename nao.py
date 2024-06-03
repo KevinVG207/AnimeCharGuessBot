@@ -42,13 +42,18 @@ def find_pixiv_or_twitter_source(image_url):
             return source
     return None
 
-def make_message_text_if_source(image_url, message):
+def source_found(image_url):
+    # print("Checking image")
     source = find_pixiv_or_twitter_source(image_url)
     if source:
-        return f"🚨🚨 WEE WOO WEE WOO 🚨🚨\n<@{message.author.id}> posted cringe (an unsourced image)!\nThe bot was able to find it on saucenao.com, **so there's no excuse for you not to do the same.**\nPlease post the source next time, or at least try to find it using <https://saucenao.com>\nAs punishment. You are now in timeout for 60 seconds!\nUse this time to repent and change your ways. (And touch grass 草)"
-    return None
+        # print("Source found")
+        return True
+        # return f"🚨🚨 WEE WOO WEE WOO 🚨🚨\n<@{message.author.id}> posted cringe (an unsourced image)!\nThe bot was able to find it on saucenao.com, **so there's no excuse for you not to do the same.**\nPlease post the source next time, or at least try to find it using <https://saucenao.com>\nAs punishment. You are now in timeout for 60 seconds!\nUse this time to repent and change your ways. (And touch grass 草)"
+    # print("Source not found")
+    return False
 
 async def check_images(message):
+    # print("Checking message")
     urls = list(util.get_image_urls(message.content))
 
     if message.content and not urls:
@@ -66,10 +71,19 @@ async def check_images(message):
     try:
         for url in urls:
             if url:
-                message_text = make_message_text_if_source(url, message)
-                if message_text:
-                    await message.reply(message_text)
-                    await message.author.timeout(datetime.datetime.now(pytz.UTC) + datetime.timedelta(seconds=60), reason="You posted cringe. Go touch grass.")
+                found_source = source_found(url)
+                if found_source:
+                    # Add reactions emoji: S O U R C E ?
+                    await message.add_reaction("🇸")
+                    await message.add_reaction("🇴")
+                    await message.add_reaction("🇺")
+                    await message.add_reaction("🇷")
+                    await message.add_reaction("🇨")
+                    await message.add_reaction("🇪")
+                    await message.add_reaction("❓")
+
+                    # await message.reply(message_text)
+                    # await message.author.timeout(datetime.datetime.now(pytz.UTC) + datetime.timedelta(seconds=60), reason="You posted cringe. Go touch grass.")
                     return
                     # message_text = make_message_text_if_source(attachment.url, message)
                     # if message_text:
@@ -77,6 +91,7 @@ async def check_images(message):
                     #     await message.author.timeout(datetime.datetime.now(pytz.UTC) + datetime.timedelta(seconds=60), reason="You posted cringe. Go touch grass.")
                     #     return
     except Exception as e:
+        print(e)
         return
 
 def main():
