@@ -26,6 +26,7 @@ import util
 import waifu_filter
 import nao
 from waifu import Waifu, Character
+import minecraft
 import logging
 logger = logging.getLogger('discord')
 
@@ -1883,6 +1884,21 @@ class AnimeCharGuessBot(discord.Client):
                 'No Uma Musume Gacha could be found.'
             ))
         return
+    
+    @command('mc')
+    async def command_minecraft_server(self, args):
+        """
+        View the status of the Minecraft server.
+        """
+        message = args.message
+        mc_guild_id = os.getenv('MC_GUILD_ID')
+
+        if not mc_guild_id or not message.guild.id == int(mc_guild_id):
+            return
+        
+        embed = await minecraft.get_mc_embed(self, args)
+        if embed:
+            await args.message.reply(embed = embed)
 
 
 AnimeCharGuessBot.command_map = _command_map

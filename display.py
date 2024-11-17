@@ -52,7 +52,7 @@ def create_embed(title, description, color = constants.EMBED_COLOR, thumbnail = 
     return embed
 
 
-async def page(bot, args, elements, title, page_no = None, page_size = 25, timeout = 30, error_message = None):
+async def page(bot, args, elements, title, page_no = None, page_size = 25, timeout = 30, error_message = None, **kwargs):
     """
     Creates a paginated display of a list of elements. The elements will be converted into strings.
     Paging is controlled by Discord buttons, and is locked if too much time passes since the last use.
@@ -86,7 +86,7 @@ async def page(bot, args, elements, title, page_no = None, page_size = 25, timeo
 
         page_texts.append('\n'.join(lines))
 
-    embed = create_embed(title + f' - Page {page_no + 1}/{pages}', page_texts[page_no])
+    embed = create_embed(title + f' - Page {page_no + 1}/{pages}', page_texts[page_no], **kwargs)
 
     if pages > 1:
         # There are multiple pages.
@@ -123,7 +123,7 @@ async def page(bot, args, elements, title, page_no = None, page_size = 25, timeo
 
                 # Merge multiple quick presses together.
                 if button_queue.empty():
-                    embed = create_embed(title + f' - Page {page_no + 1}/{pages}', page_texts[page_no])
+                    embed = create_embed(title + f' - Page {page_no + 1}/{pages}', page_texts[page_no], **kwargs)
 
                     await message.edit(embed = embed, view = view)
 
