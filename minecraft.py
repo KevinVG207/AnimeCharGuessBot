@@ -9,7 +9,7 @@ async def get_mc_embed(bot, args):
     except:
         return display.create_embed("Minecraft Server Error", "Server could not be reached.")
     
-    players = [f"`{player.name}`" for player in status.players.sample]
+    players = [f"`{player.name}`" for player in status.players.sample] if status.players.sample else []
 
     await display.page(bot, args, players, "Online: " + str(status.players.online) + "/" + str(status.players.max))
     return None
