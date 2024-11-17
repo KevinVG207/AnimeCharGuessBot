@@ -1885,7 +1885,7 @@ class AnimeCharGuessBot(discord.Client):
             ))
         return
     
-    @command('mc')
+    @command('mc', only_in_assigned_channel = False)
     async def command_minecraft_server(self, args):
         """
         View the status of the Minecraft server.
