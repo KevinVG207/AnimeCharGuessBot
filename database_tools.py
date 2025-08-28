@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import os.path
 import random
 import sqlite3
 
