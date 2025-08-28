@@ -161,8 +161,8 @@ class AnimeCharGuessBot(discord.Client):
             # Not a command, but we are in a guild
             
             # Handle Twitter/X links
-            await self.fix_urls(message, ['twitter.com', 'x.com'], "https://vxtwitter.com")
-            await self.fix_urls(message, ['pixiv.net'], "https://phixiv.net")
+            # await self.fix_urls(message, ['twitter.com', 'x.com'], "https://vxtwitter.com")
+            # await self.fix_urls(message, ['pixiv.net'], "https://phixiv.net")
             
             # We might want to drop or check if a drop guess is correct.
             drop = self.active_drops.get(message.guild.id)

@@ -58,9 +58,7 @@ async def handle_disconnect(from_reboot = False):
 
 
 def reboot():
-    if bot_token.isDebug():
-        quit(404)
-    os.system("sudo reboot")
+    quit(404)
 
 
 def write_downtime():
