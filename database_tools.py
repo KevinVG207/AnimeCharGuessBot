@@ -11,8 +11,8 @@ import name_tools as nt
 import logging
 logger = logging.getLogger('discord')
 
-WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-DATABASE_URI = WORKING_DIR + "/database/database.db"
+# WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+DATABASE_URI = os.getenv("ACGB_DATABASE")
 
 DAILY_CURRENCY = 500
 
